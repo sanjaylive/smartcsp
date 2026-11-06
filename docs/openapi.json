@@ -883,6 +883,56 @@
         ]
       }
     },
+    "/v1/onboarding/new-shop": {
+      "post": {
+        "summary": "Start onboarding an additional shop (the current shop is unaffected)",
+        "tags": [
+          "Onboarding"
+        ],
+        "operationId": "Onboarding_newShop",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/v1/onboarding/services": {
       "put": {
         "summary": "Save selected services (step 4)",
