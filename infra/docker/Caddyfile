@@ -1,0 +1,21 @@
+# Automatic HTTPS for the three public hostnames. HSTS + basic hardening headers.
+{$APP_DOMAIN} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	reverse_proxy web:3000
+}
+{$ADMIN_DOMAIN} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	# Optionally restrict the admin console to office/VPN IPs:
+	# @blocked not remote_ip 203.0.113.0/24
+	# respond @blocked 403
+	reverse_proxy admin:3000
+}
+{$API_DOMAIN} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	@internal path /metrics
+	respond @internal 404
+	reverse_proxy api:4610
+}

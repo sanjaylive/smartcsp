@@ -1,0 +1,25 @@
+{
+  "name": "csp2all",
+  "private": true,
+  "packageManager": "pnpm@10.34.9",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "infra:up": "docker compose -f infra/docker/compose.dev.yml up -d",
+    "infra:down": "docker compose -f infra/docker/compose.dev.yml down",
+    "db:migrate": "pnpm --filter @csp2all/api db:migrate",
+    "db:seed": "pnpm --filter @csp2all/api db:seed"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.10",
+    "turbo": "^2.11.10"
+  }
+}

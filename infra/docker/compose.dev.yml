@@ -1,0 +1,41 @@
+# Local development infrastructure for CSP2All.
+# All ports bind to 127.0.0.1 only. Never expose Postgres/Redis publicly.
+name: csp2all-dev
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_dev_only
+      CSP2ALL_OWNER_PASSWORD: owner_dev_only
+      CSP2ALL_APP_PASSWORD: app_dev_only
+    ports: ['127.0.0.1:56632:5432']
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      retries: 20
+  redis:
+    image: redis:7.4-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    ports: ['127.0.0.1:56679:6379']
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports: ['127.0.0.1:56625:1025', '127.0.0.1:56626:8025']
+  s3:
+    image: chrislusf/seaweedfs:3.97
+    command: ['server', '-s3', '-dir=/data', '-s3.config=/etc/seaweedfs/s3.json']
+    ports: ['127.0.0.1:56633:8333']
+    volumes:
+      - s3data:/data
+      - ./seaweedfs-s3.json:/etc/seaweedfs/s3.json:ro
+volumes:
+  pgdata:
+  redisdata:
+  s3data:

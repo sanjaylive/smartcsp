@@ -1,0 +1,11 @@
+{
+  "identities": [
+    {
+      "name": "csp2all-dev",
+      "credentials": [
+        { "accessKey": "csp2all_dev_access", "secretKey": "csp2all_dev_secret_only" }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

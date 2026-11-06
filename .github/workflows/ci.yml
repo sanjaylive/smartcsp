@@ -1,0 +1,89 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 20
+      redis:
+        image: redis:7.4-alpine
+        ports: ['6379:6379']
+    env:
+      TEST_DATABASE_URL: postgresql://csp2all_app:app_ci@127.0.0.1:5432/csp2all_test
+      TEST_OWNER_DATABASE_URL: postgresql://csp2all_owner:owner_ci@127.0.0.1:5432/csp2all_test
+      TEST_REDIS_URL: redis://127.0.0.1:6379/3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Create database roles (owner + RLS-restricted app role)
+        env: { PGPASSWORD: postgres }
+        run: |
+          psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE csp2all_owner LOGIN PASSWORD 'owner_ci';
+          CREATE ROLE csp2all_app LOGIN PASSWORD 'app_ci' NOBYPASSRLS;
+          CREATE DATABASE csp2all_test OWNER csp2all_owner;
+          CREATE DATABASE csp2all_shadow OWNER csp2all_owner;
+          SQL
+          psql -h 127.0.0.1 -U postgres -d csp2all_test -v ON_ERROR_STOP=1 <<'SQL'
+          REVOKE ALL ON SCHEMA public FROM PUBLIC;
+          ALTER SCHEMA public OWNER TO csp2all_owner;
+          GRANT USAGE ON SCHEMA public TO csp2all_app;
+          ALTER DEFAULT PRIVILEGES FOR ROLE csp2all_owner IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO csp2all_app;
+          SQL
+      - run: pnpm --filter @csp2all/shared build
+      - run: pnpm --filter @csp2all/api exec prisma generate
+      - name: Format
+        run: pnpm format:check
+      - name: Type check
+        run: pnpm -r --filter "./apps/*" --filter "./packages/*" typecheck
+      - name: Lint
+        run: pnpm -r --filter "./apps/*" --filter "./packages/*" lint
+      - name: Shared unit tests
+        run: pnpm --filter @csp2all/shared test
+      - name: API tests (unit + DB + API integration incl. RLS)
+        run: pnpm --filter @csp2all/api test
+      - name: Migration drift check
+        run: pnpm --filter @csp2all/api db:drift
+        env:
+          MIGRATION_DATABASE_URL: postgresql://csp2all_owner:owner_ci@127.0.0.1:5432/csp2all_test
+          SHADOW_DATABASE_URL: postgresql://csp2all_owner:owner_ci@127.0.0.1:5432/csp2all_shadow
+      - name: Build all
+        run: pnpm -r --filter "./apps/*" build
+      - name: OpenAPI is up to date
+        run: pnpm --filter @csp2all/api openapi && git diff --exit-code docs/openapi.json
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: node
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f infra/docker/api.Dockerfile -t csp2all-api:ci .
+      - run: docker build -f infra/docker/next.Dockerfile --build-arg APP=web -t csp2all-web:ci .
+      - run: docker build -f infra/docker/next.Dockerfile --build-arg APP=admin -t csp2all-admin:ci .
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: apps/mobile } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable, cache: true }
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test

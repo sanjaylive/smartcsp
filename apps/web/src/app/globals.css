@@ -1,0 +1,294 @@
+@import 'tailwindcss';
+
+/*
+ * Theme mirrors packages/shared/src/tokens.ts. Colours are CSS variables so that light and dark
+ * themes switch without per-class `dark:` variants. Text pairs meet WCAG AA on their surfaces.
+ */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+:root {
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --surface-muted: #eef0f7;
+  --border: #dde1ec;
+  --fg: #161a2e;
+  --fg-muted: #525a75;
+  --brand: #4f46e5;
+  --brand-strong: #4338ca;
+  --brand-alt: #7c3aed;
+  --on-brand: #ffffff;
+  --success: #15803d;
+  --warning: #b45309;
+  --danger: #b91c1c;
+  --info: #1d4ed8;
+  --focus: #6366f1;
+  --success-bg: #dcfce7;
+  --warning-bg: #fef3c7;
+  --danger-bg: #fee2e2;
+  --info-bg: #dbeafe;
+  --brand-bg: #e0e7ff;
+  --shadow-card: 0 1px 2px rgba(22, 26, 46, 0.06), 0 1px 3px rgba(22, 26, 46, 0.08);
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg: #0e1020;
+  --surface: #171a2e;
+  --surface-muted: #20243b;
+  --border: #2e3352;
+  --fg: #eceef8;
+  --fg-muted: #a3a9c7;
+  --brand: #818cf8;
+  --brand-strong: #a5b4fc;
+  --brand-alt: #a78bfa;
+  --on-brand: #0e1020;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --info: #60a5fa;
+  --focus: #a5b4fc;
+  --success-bg: #15301f;
+  --warning-bg: #3b2a12;
+  --danger-bg: #3a1820;
+  --info-bg: #1a2a4f;
+  --brand-bg: #26295a;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0e1020;
+    --surface: #171a2e;
+    --surface-muted: #20243b;
+    --border: #2e3352;
+    --fg: #eceef8;
+    --fg-muted: #a3a9c7;
+    --brand: #818cf8;
+    --brand-strong: #a5b4fc;
+    --brand-alt: #a78bfa;
+    --on-brand: #0e1020;
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --info: #60a5fa;
+    --focus: #a5b4fc;
+    --success-bg: #15301f;
+    --warning-bg: #3b2a12;
+    --danger-bg: #3a1820;
+    --info-bg: #1a2a4f;
+    --brand-bg: #26295a;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-alt: var(--brand-alt);
+  --color-on-brand: var(--on-brand);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-focus: var(--focus);
+  --color-success-bg: var(--success-bg);
+  --color-warning-bg: var(--warning-bg);
+  --color-danger-bg: var(--danger-bg);
+  --color-info-bg: var(--info-bg);
+  --color-brand-bg: var(--brand-bg);
+  --color-acc-bg: var(--acc-bg);
+  --color-acc-fg: var(--acc-fg);
+  --shadow-card: var(--shadow-card);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --font-sans:
+    'Inter', 'Noto Sans Devanagari', 'Nirmala UI', system-ui, -apple-system, 'Segoe UI', Roboto,
+    sans-serif;
+}
+
+/* Service accents (tokens.color.accent): tinted background + AA foreground. */
+.accent-indigo {
+  --acc-bg: #e0e7ff;
+  --acc-fg: #3730a3;
+}
+.accent-violet {
+  --acc-bg: #ede9fe;
+  --acc-fg: #5b21b6;
+}
+.accent-teal {
+  --acc-bg: #ccfbf1;
+  --acc-fg: #115e59;
+}
+.accent-blue {
+  --acc-bg: #dbeafe;
+  --acc-fg: #1e40af;
+}
+.accent-amber {
+  --acc-bg: #fef3c7;
+  --acc-fg: #92400e;
+}
+.accent-coral {
+  --acc-bg: #ffe4dc;
+  --acc-fg: #9a3412;
+}
+.accent-green {
+  --acc-bg: #dcfce7;
+  --acc-fg: #166534;
+}
+.accent-sky {
+  --acc-bg: #e0f2fe;
+  --acc-fg: #075985;
+}
+.accent-rose {
+  --acc-bg: #ffe4e6;
+  --acc-fg: #9f1239;
+}
+.accent-slate {
+  --acc-bg: #e2e8f0;
+  --acc-fg: #334155;
+}
+
+[data-theme='dark'] .accent-indigo {
+  --acc-bg: #26295a;
+  --acc-fg: #c7d2fe;
+}
+[data-theme='dark'] .accent-violet {
+  --acc-bg: #2e2356;
+  --acc-fg: #ddd6fe;
+}
+[data-theme='dark'] .accent-teal {
+  --acc-bg: #12343a;
+  --acc-fg: #99f6e4;
+}
+[data-theme='dark'] .accent-blue {
+  --acc-bg: #1a2a4f;
+  --acc-fg: #bfdbfe;
+}
+[data-theme='dark'] .accent-amber {
+  --acc-bg: #3b2a12;
+  --acc-fg: #fde68a;
+}
+[data-theme='dark'] .accent-coral {
+  --acc-bg: #3d2118;
+  --acc-fg: #fed7aa;
+}
+[data-theme='dark'] .accent-green {
+  --acc-bg: #15301f;
+  --acc-fg: #bbf7d0;
+}
+[data-theme='dark'] .accent-sky {
+  --acc-bg: #132e40;
+  --acc-fg: #bae6fd;
+}
+[data-theme='dark'] .accent-rose {
+  --acc-bg: #3a1824;
+  --acc-fg: #fecdd3;
+}
+[data-theme='dark'] .accent-slate {
+  --acc-bg: #252b38;
+  --acc-fg: #cbd5e1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .accent-indigo {
+    --acc-bg: #26295a;
+    --acc-fg: #c7d2fe;
+  }
+  :root:not([data-theme='light']) .accent-violet {
+    --acc-bg: #2e2356;
+    --acc-fg: #ddd6fe;
+  }
+  :root:not([data-theme='light']) .accent-teal {
+    --acc-bg: #12343a;
+    --acc-fg: #99f6e4;
+  }
+  :root:not([data-theme='light']) .accent-blue {
+    --acc-bg: #1a2a4f;
+    --acc-fg: #bfdbfe;
+  }
+  :root:not([data-theme='light']) .accent-amber {
+    --acc-bg: #3b2a12;
+    --acc-fg: #fde68a;
+  }
+  :root:not([data-theme='light']) .accent-coral {
+    --acc-bg: #3d2118;
+    --acc-fg: #fed7aa;
+  }
+  :root:not([data-theme='light']) .accent-green {
+    --acc-bg: #15301f;
+    --acc-fg: #bbf7d0;
+  }
+  :root:not([data-theme='light']) .accent-sky {
+    --acc-bg: #132e40;
+    --acc-fg: #bae6fd;
+  }
+  :root:not([data-theme='light']) .accent-rose {
+    --acc-bg: #3a1824;
+    --acc-fg: #fecdd3;
+  }
+  :root:not([data-theme='light']) .accent-slate {
+    --acc-bg: #252b38;
+    --acc-fg: #cbd5e1;
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  :focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  ::selection {
+    background: var(--brand-bg);
+  }
+}
+
+@layer components {
+  .money {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+    white-space: nowrap;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow-card);
+  }
+  /* Grid items may shrink below their content (wide tables scroll inside their own wrapper). */
+  .grid > * {
+    min-width: 0;
+  }
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 8px;
+    z-index: 100;
+  }
+  .skip-link:focus {
+    left: 8px;
+    background: var(--surface);
+    padding: 8px 12px;
+    border-radius: 8px;
+  }
+}

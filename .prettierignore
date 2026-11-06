@@ -1,0 +1,12 @@
+node_modules
+dist
+.next
+coverage
+pnpm-lock.yaml
+apps/mobile
+**/migrations/**/*.sql
+playwright-report
+test-results
+**/.next
+**/e2e/.auth
+docs/openapi.json

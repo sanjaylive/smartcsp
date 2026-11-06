@@ -1,0 +1,966 @@
+// CSP2All database schema.
+// Conventions:
+//  * Every tenant-owned table has `tenantId` and is protected by PostgreSQL RLS (see migration `rls`).
+//  * Cross-entity references inside a tenant use composite (tenantId, id) foreign keys so a row can
+//    never point at another tenant's row.
+//  * Money is BigInt paise. Business dates are DATE in the tenant's timezone.
+//  * Financial & audit rows are append-only; corrections are compensating rows.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = []
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================ identity
+
+model User {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  email       String   @unique
+  displayName String?
+  locale      String   @default("en")
+  status      String   @default("ACTIVE") // ACTIVE | DISABLED
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  memberships   Membership[]
+  sessions      Session[]
+  platformAdmin PlatformAdmin?
+  onboarding    OnboardingDraft?
+
+  @@map("users")
+}
+
+model PlatformAdmin {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  userId          String    @unique @db.Uuid
+  role            String // SUPER_ADMIN | SUPPORT
+  status          String    @default("ACTIVE")
+  totpSecretEnc   String? // AES-256-GCM encrypted with SECRETS_ENCRYPTION_KEY
+  totpEnabledAt   DateTime?
+  totpLastStep    BigInt? // replay protection for TOTP codes
+  createdAt       DateTime  @default(now())
+  createdByUserId String?   @db.Uuid
+  version         Int       @default(0)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("platform_admins")
+}
+
+model OtpChallenge {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  email        String
+  purpose      String // LOGIN | ADMIN_LOGIN
+  codeHash     String // HMAC-SHA256(OTP_PEPPER, id:email:purpose:code)
+  attempts     Int       @default(0)
+  maxAttempts  Int
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  supersededAt DateTime?
+  ipHash       String?
+  createdAt    DateTime  @default(now())
+
+  @@index([email, purpose, createdAt])
+  @@index([ipHash, createdAt])
+  @@map("otp_challenges")
+}
+
+model Session {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  userId          String    @db.Uuid
+  kind            String // WEB | MOBILE | ADMIN
+  tokenHash       String    @unique // web cookie token or mobile access token (SHA-256)
+  tokenExpiresAt  DateTime
+  activeTenantId  String?   @db.Uuid
+  mfaVerifiedAt   DateTime?
+  deviceName      String?
+  userAgent       String?
+  ipHash          String?
+  createdAt       DateTime  @default(now())
+  lastSeenAt      DateTime  @default(now())
+  idleExpiresAt   DateTime
+  absoluteExpires DateTime
+  revokedAt       DateTime?
+  revokeReason    String?
+
+  user          User           @relation(fields: [userId], references: [id])
+  refreshTokens RefreshToken[]
+
+  @@index([userId, revokedAt])
+  @@map("sessions")
+}
+
+/// Rotating refresh tokens (mobile). Reuse of a used token revokes the whole session.
+model RefreshToken {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  sessionId String    @db.Uuid
+  tokenHash String    @unique
+  usedAt    DateTime?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("refresh_tokens")
+}
+
+model OnboardingDraft {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  userId            String   @unique @db.Uuid
+  step              String   @default("SHOP") // SHOP | SERVICES | DONE
+  shop              Json?
+  services          String[] @default([])
+  completedTenantId String?  @db.Uuid
+  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("onboarding_drafts")
+}
+
+// ============================================================================ tenancy
+
+model Tenant {
+  id                   String   @id @default(uuid(7)) @db.Uuid
+  name                 String
+  ownerDisplayName     String
+  status               String   @default("ACTIVE") // ACTIVE | SUSPENDED | PENDING_DELETION
+  statusReason         String?
+  contactPhone         String?
+  contactPhoneVerified Boolean  @default(false)
+  state                String
+  district             String
+  address              String?
+  locale               String   @default("en")
+  timezone             String   @default("Asia/Kolkata")
+  logoAttachmentId     String?  @db.Uuid
+  brandColor           String?
+  receiptFooter        String?
+  provisioningKey      String   @unique // idempotency for onboarding completion
+  createdByUserId      String   @db.Uuid
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  version              Int      @default(0)
+
+  branches     Branch[]
+  memberships  Membership[]
+  services     TenantService[]
+  subscription Subscription?
+
+  @@map("tenants")
+}
+
+model Branch {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @db.Uuid
+  name      String
+  isPrimary Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, id])
+  @@map("branches")
+}
+
+model Membership {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  tenantId        String   @db.Uuid
+  userId          String   @db.Uuid
+  role            String // OWNER | MANAGER | OPERATOR | ACCOUNTANT
+  status          String   @default("ACTIVE") // INVITED | ACTIVE | DISABLED
+  displayName     String?
+  grants          String[] @default([])
+  revokes         String[] @default([])
+  invitedByUserId String?  @db.Uuid
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  version         Int      @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([tenantId, userId])
+  @@index([userId])
+  @@map("memberships")
+}
+
+/// Atomic per-tenant sequences (record numbers, journal entry numbers, receipts).
+model TenantCounter {
+  tenantId String @db.Uuid
+  name     String
+  value    BigInt @default(0)
+
+  @@id([tenantId, name])
+  @@map("tenant_counters")
+}
+
+// ============================================================================ services
+
+model ServiceDefinition {
+  code            String   @id
+  name            String
+  category        String
+  workflowType    String
+  platformEnabled Boolean  @default(true)
+  providerCapable Boolean  @default(false)
+  sortOrder       Int      @default(0)
+  updatedAt       DateTime @updatedAt
+
+  @@map("service_definitions")
+}
+
+model TenantService {
+  tenantId       String    @db.Uuid
+  serviceCode    String
+  enabled        Boolean   @default(true)
+  enabledAt      DateTime  @default(now())
+  disabledAt     DateTime?
+  disabledReason String?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@id([tenantId, serviceCode])
+  @@map("tenant_services")
+}
+
+model CustomServiceDefinition {
+  id                 String   @id @default(uuid(7)) @db.Uuid
+  tenantId           String   @db.Uuid
+  name               String
+  category           String
+  workflowType       String
+  principalDirection String   @default("NONE")
+  defaultFeePaise    BigInt   @default(0)
+  fields             Json     @default("[]")
+  active             Boolean  @default(true)
+  createdByUserId    String   @db.Uuid
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  version            Int      @default(0)
+
+  records ServiceRecord[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, name])
+  @@map("custom_service_definitions")
+}
+
+// ============================================================================ customers & records
+
+model Customer {
+  id                 String    @id @default(uuid(7)) @db.Uuid
+  tenantId           String    @db.Uuid
+  name               String
+  nameLower          String
+  phone              String?
+  email              String?
+  notes              String?
+  followUpPreference String    @default("NONE")
+  archivedAt         DateTime?
+  createdByUserId    String    @db.Uuid
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  version            Int       @default(0)
+
+  records   ServiceRecord[]
+  followUps FollowUpTask[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, nameLower])
+  @@index([tenantId, phone])
+  @@map("customers")
+}
+
+model ServiceRecord {
+  id                      String    @id @default(uuid(7)) @db.Uuid
+  tenantId                String    @db.Uuid
+  branchId                String    @db.Uuid
+  recordNo                Int
+  serviceCode             String
+  customServiceId         String?   @db.Uuid
+  workflowType            String
+  principalDirection      String // PAYOUT | COLLECT | NONE (fixed at creation)
+  customerId              String?   @db.Uuid
+  walkInName              String?
+  txnDate                 DateTime  @db.Date
+  principalPaise          BigInt    @default(0)
+  customerFeePaise        BigInt    @default(0)
+  expectedCommissionPaise BigInt    @default(0)
+  receivedCommissionPaise BigInt    @default(0)
+  paymentMethod           String    @default("CASH")
+  principalMethod         String    @default("CASH")
+  amountCollectedPaise    BigInt    @default(0) // at record time
+  amountAllocatedPaise    BigInt    @default(0) // later collections
+  amountDuePaise          BigInt    @default(0)
+  externalRef             String?
+  assignedToUserId        String?   @db.Uuid
+  notes                   String?
+  followUpDate            DateTime? @db.Date
+  details                 Json      @default("{}")
+  source                  String    @default("MANUAL")
+  opStatus                String
+  paymentStatus           String    @default("NOT_APPLICABLE")
+  postingStatus           String    @default("UNPOSTED")
+  postingSeq              Int       @default(0)
+  connectorStatus         String    @default("NONE")
+  clientRef               String?
+  createdByUserId         String    @db.Uuid
+  updatedByUserId         String?   @db.Uuid
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  version                 Int       @default(0)
+
+  customer      Customer?                @relation(fields: [tenantId, customerId], references: [tenantId, id], onDelete: Restrict)
+  customService CustomServiceDefinition? @relation(fields: [tenantId, customServiceId], references: [tenantId, id], onDelete: Restrict)
+  events        RecordStatusEvent[]
+  allocations   PaymentAllocation[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, recordNo])
+  @@unique([tenantId, clientRef])
+  @@index([tenantId, serviceCode, txnDate])
+  @@index([tenantId, txnDate])
+  @@index([tenantId, customerId])
+  @@index([tenantId, opStatus])
+  @@index([tenantId, amountDuePaise])
+  @@index([tenantId, createdByUserId])
+  @@map("service_records")
+}
+
+model RecordStatusEvent {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @db.Uuid
+  recordId    String   @db.Uuid
+  dimension   String // OPERATIONAL | PAYMENT | POSTING | CONNECTOR | EDIT
+  fromStatus  String?
+  toStatus    String?
+  reason      String?
+  data        Json?
+  actorUserId String?  @db.Uuid
+  actorType   String   @default("USER")
+  createdAt   DateTime @default(now())
+
+  record ServiceRecord @relation(fields: [tenantId, recordId], references: [tenantId, id], onDelete: Restrict)
+
+  @@index([tenantId, recordId, createdAt])
+  @@map("record_status_events")
+}
+
+model Attachment {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  tenantId        String    @db.Uuid
+  ownerType       String // RECORD | CUSTOMER | PAYMENT_SUBMISSION | TENANT_LOGO
+  ownerId         String    @db.Uuid
+  storageKey      String    @unique
+  fileName        String
+  contentType     String
+  sizeBytes       Int
+  sha256          String
+  scanStatus      String    @default("PENDING") // PENDING | CLEAN | INFECTED | SKIPPED
+  uploadedByUserId String   @db.Uuid
+  createdAt       DateTime  @default(now())
+  deletedAt       DateTime?
+
+  @@unique([tenantId, id])
+  @@index([tenantId, ownerType, ownerId])
+  @@map("attachments")
+}
+
+model FollowUpTask {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  tenantId         String    @db.Uuid
+  recordId         String?   @db.Uuid
+  customerId       String?   @db.Uuid
+  title            String
+  notes            String?
+  dueDate          DateTime  @db.Date
+  status           String    @default("OPEN") // OPEN | DONE | CANCELLED
+  assignedToUserId String?   @db.Uuid
+  completedAt      DateTime?
+  createdByUserId  String    @db.Uuid
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  version          Int       @default(0)
+
+  customer Customer? @relation(fields: [tenantId, customerId], references: [tenantId, id], onDelete: Restrict)
+
+  @@index([tenantId, status, dueDate])
+  @@map("follow_up_tasks")
+}
+
+// ============================================================================ money
+
+model Collection {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  tenantId        String   @db.Uuid
+  receiptNo       Int
+  customerId      String?  @db.Uuid
+  method          String
+  amountPaise     BigInt
+  receivedOn      DateTime @db.Date
+  notes           String?
+  journalEntryId  String   @db.Uuid
+  reversedAt      DateTime?
+  reversalReason  String?
+  reversalEntryId String?  @db.Uuid
+  createdByUserId String   @db.Uuid
+  createdAt       DateTime @default(now())
+
+  allocations PaymentAllocation[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, receiptNo])
+  @@map("collections")
+}
+
+model PaymentAllocation {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @db.Uuid
+  collectionId String   @db.Uuid
+  recordId     String   @db.Uuid
+  amountPaise  BigInt
+  createdAt    DateTime @default(now())
+
+  collection Collection    @relation(fields: [tenantId, collectionId], references: [tenantId, id], onDelete: Restrict)
+  record     ServiceRecord @relation(fields: [tenantId, recordId], references: [tenantId, id], onDelete: Restrict)
+
+  @@index([tenantId, recordId])
+  @@map("payment_allocations")
+}
+
+model Expense {
+  id                     String    @id @default(uuid(7)) @db.Uuid
+  tenantId               String    @db.Uuid
+  category               String
+  amountPaise            BigInt
+  method                 String // CASH | BANK | FLOAT
+  paidOn                 DateTime  @db.Date
+  vendor                 String?
+  notes                  String?
+  journalEntryId         String    @db.Uuid
+  reversedAt             DateTime?
+  reversalReason         String?
+  reversalJournalEntryId String?   @db.Uuid
+  createdByUserId        String    @db.Uuid
+  createdAt              DateTime  @default(now())
+
+  @@unique([tenantId, id])
+  @@index([tenantId, paidOn])
+  @@map("expenses")
+}
+
+model CommissionReceipt {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  tenantId        String   @db.Uuid
+  method          String
+  amountPaise     BigInt
+  receivedOn      DateTime @db.Date
+  allocations     Json     @default("[]") // [{recordId, amountPaise}]
+  notes           String?
+  journalEntryId  String   @db.Uuid
+  createdByUserId String   @db.Uuid
+  createdAt       DateTime @default(now())
+
+  @@unique([tenantId, id])
+  @@map("commission_receipts")
+}
+
+model LedgerAccount {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @db.Uuid
+  code      String // e.g. 1000
+  key       String // CASH | BANK | FLOAT | RECEIVABLE | COMMISSION_RECEIVABLE | CAPITAL | FEE_INCOME | COMMISSION_INCOME | EXPENSE | CASH_OVER_SHORT
+  name      String
+  type      String // ASSET | LIABILITY | EQUITY | INCOME | EXPENSE
+  system    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  lines JournalLine[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, code])
+  @@unique([tenantId, key])
+  @@map("ledger_accounts")
+}
+
+model JournalEntry {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  tenantId          String   @db.Uuid
+  entryNo           Int
+  businessDate      DateTime @db.Date
+  type              String // RECORD | RECORD_REVERSAL | COLLECTION | EXPENSE | EXPENSE_REVERSAL | COMMISSION_RECEIPT | OPENING_BALANCE | ADJUSTMENT | TRANSFER | CLOSING_VARIANCE | CLOSING_VARIANCE_REVERSAL
+  sourceType        String
+  sourceId          String   @db.Uuid
+  postingKey        String // unique per tenant — prevents duplicate posting
+  description       String
+  reversesEntryId   String?  @db.Uuid
+  reversedByEntryId String?  @db.Uuid
+  createdByUserId   String?  @db.Uuid
+  createdAt         DateTime @default(now())
+
+  lines JournalLine[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, entryNo])
+  @@unique([tenantId, postingKey])
+  @@index([tenantId, businessDate])
+  @@index([tenantId, sourceType, sourceId])
+  @@map("journal_entries")
+}
+
+model JournalLine {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @db.Uuid
+  entryId      String   @db.Uuid
+  accountId    String   @db.Uuid
+  debitPaise   BigInt   @default(0)
+  creditPaise  BigInt   @default(0)
+  memo         String?
+  businessDate DateTime @db.Date // denormalised for fast balance queries
+  createdAt    DateTime @default(now())
+
+  entry   JournalEntry  @relation(fields: [tenantId, entryId], references: [tenantId, id], onDelete: Restrict)
+  account LedgerAccount @relation(fields: [tenantId, accountId], references: [tenantId, id], onDelete: Restrict)
+
+  @@index([tenantId, accountId, businessDate])
+  @@index([tenantId, entryId])
+  @@map("journal_lines")
+}
+
+model DailyClosing {
+  id                   String    @id @default(uuid(7)) @db.Uuid
+  tenantId             String    @db.Uuid
+  businessDate         DateTime  @db.Date
+  status               String // CLOSED | REOPEN_REQUESTED | REOPENED
+  openingCashPaise     BigInt
+  cashInPaise          BigInt
+  cashOutPaise         BigInt
+  expectedCashPaise    BigInt
+  countedCashPaise     BigInt
+  variancePaise        BigInt
+  varianceEntryId      String?   @db.Uuid
+  notes                String?
+  summary              Json      @default("{}")
+  closedByUserId       String    @db.Uuid
+  closedAt             DateTime
+  reopenRequestedBy    String?   @db.Uuid
+  reopenRequestedAt    DateTime?
+  reopenReason         String?
+  reopenApprovedBy     String?   @db.Uuid
+  reopenedAt           DateTime?
+  closeCount           Int       @default(1)
+  version              Int       @default(0)
+
+  @@unique([tenantId, businessDate])
+  @@map("daily_closings")
+}
+
+// ============================================================================ plans & subscriptions
+
+model Plan {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  code             String   @unique // FREE | GROWTH | PRO (stable; display name is versioned)
+  isActive         Boolean  @default(true)
+  isDefault        Boolean  @default(false) // assigned to new tenants
+  sortOrder        Int      @default(0)
+  currentVersionId String?  @db.Uuid
+  createdAt        DateTime @default(now())
+
+  versions PlanVersion[]
+
+  @@map("plans")
+}
+
+model PlanVersion {
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  planId              String   @db.Uuid
+  version             Int
+  name                String
+  description         String?
+  monthlyPricePaise   BigInt
+  annualPricePaise    BigInt
+  currency            String   @default("INR")
+  taxRateBps          Int      @default(1800)
+  taxInclusive        Boolean  @default(false)
+  trialDays           Int      @default(0)
+  graceDays           Int      @default(7)
+  entitlements        Json
+  existingSubscribers String   @default("KEEP_CURRENT_VERSION")
+  isDemoDefault       Boolean  @default(false)
+  createdByUserId     String?  @db.Uuid
+  createdAt           DateTime @default(now())
+
+  plan Plan @relation(fields: [planId], references: [id])
+
+  @@unique([planId, version])
+  @@map("plan_versions")
+}
+
+model Subscription {
+  id                     String    @id @default(uuid(7)) @db.Uuid
+  tenantId               String    @unique @db.Uuid
+  planVersionId          String    @db.Uuid
+  status                 String // TRIALING | ACTIVE | GRACE | EXPIRED | CANCELLED
+  billingCycle           String // NONE | MONTHLY | ANNUAL
+  currentPeriodStart     DateTime
+  currentPeriodEnd       DateTime?
+  graceEndsAt            DateTime?
+  scheduledPlanVersionId String?   @db.Uuid
+  scheduledBillingCycle  String?
+  scheduledChangeAt      DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  version                Int       @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("subscriptions")
+}
+
+model SubscriptionEvent {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  tenantId          String   @db.Uuid
+  subscriptionId    String   @db.Uuid
+  type              String // CREATED | TRIAL_STARTED | ACTIVATED | PLAN_CHANGED | CHANGE_SCHEDULED | GRACE_STARTED | EXPIRED | DOWNGRADED | RENEWED | OVERRIDE_SET
+  fromPlanVersionId String?  @db.Uuid
+  toPlanVersionId   String?  @db.Uuid
+  data              Json?
+  actorUserId       String?  @db.Uuid
+  actorType         String   @default("SYSTEM")
+  createdAt         DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@map("subscription_events")
+}
+
+model EntitlementOverride {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  tenantId        String    @db.Uuid
+  key             String
+  value           Json
+  reason          String
+  expiresAt       DateTime?
+  revokedAt       DateTime?
+  createdByUserId String    @db.Uuid
+  createdAt       DateTime  @default(now())
+
+  @@index([tenantId, key])
+  @@map("entitlement_overrides")
+}
+
+model UsageCounter {
+  tenantId  String   @db.Uuid
+  metric    String // RECORDS_CREATED
+  periodKey String // YYYY-MM in tenant timezone
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@id([tenantId, metric, periodKey])
+  @@map("usage_counters")
+}
+
+model UsageAdjustment {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  tenantId       String   @db.Uuid
+  metric         String
+  periodKey      String
+  delta          Int
+  reason         String
+  idempotencyKey String
+  createdAt      DateTime @default(now())
+
+  @@unique([tenantId, idempotencyKey])
+  @@map("usage_adjustments")
+}
+
+model PaymentSubmission {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  tenantId          String    @db.Uuid
+  planVersionId     String    @db.Uuid
+  billingCycle      String
+  method            String
+  payerReference    String
+  paidOn            DateTime  @db.Date
+  amountPaise       BigInt
+  expectedPaise     BigInt
+  notes             String?
+  status            String    @default("SUBMITTED") // SUBMITTED | APPROVED | REJECTED
+  submittedByUserId String    @db.Uuid
+  reviewedByUserId  String?   @db.Uuid
+  reviewedAt        DateTime?
+  reviewNotes       String?
+  createdAt         DateTime  @default(now())
+  version           Int       @default(0)
+
+  @@index([status, createdAt])
+  @@index([tenantId, createdAt])
+  @@map("payment_submissions")
+}
+
+// ============================================================================ connectors
+
+model ConnectorConfig {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  tenantId          String    @db.Uuid
+  provider          String // PAY2ALL
+  mode              String    @default("DISABLED") // DISABLED | SIMULATOR | LIVE
+  credentialsEnc    String?
+  credentialsMasked Json?
+  keyVersion        Int       @default(1)
+  enabledServices   String[]  @default([])
+  lastHealthAt      DateTime?
+  lastHealthStatus  String?
+  updatedByUserId   String?   @db.Uuid
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  version           Int       @default(0)
+
+  @@unique([tenantId, provider])
+  @@map("connector_configs")
+}
+
+model ProviderOperation {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  tenantId       String    @db.Uuid
+  recordId       String    @db.Uuid
+  provider       String
+  mode           String // SIMULATOR | LIVE
+  operationType  String
+  idempotencyKey String
+  requestHash    String
+  status         String // INITIATED | PENDING | UNKNOWN | CONFIRMED | FAILED
+  providerRef    String?
+  attempts       Int       @default(0)
+  lastError      String?
+  createdByUserId String   @db.Uuid
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  resolvedAt     DateTime?
+
+  events ProviderOperationEvent[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, idempotencyKey])
+  @@unique([provider, providerRef])
+  @@index([status, updatedAt])
+  @@map("provider_operations")
+}
+
+model ProviderOperationEvent {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @db.Uuid
+  operationId String   @db.Uuid
+  fromStatus  String?
+  toStatus    String
+  source      String // API | WEBHOOK | RECONCILIATION | USER
+  data        Json?
+  createdAt   DateTime @default(now())
+
+  operation ProviderOperation @relation(fields: [tenantId, operationId], references: [tenantId, id], onDelete: Restrict)
+
+  @@index([tenantId, operationId])
+  @@map("provider_operation_events")
+}
+
+/// Not tenant-scoped on arrival: tenant is resolved only after signature verification.
+model WebhookReceipt {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  provider       String
+  deliveryId     String
+  tenantId       String?   @db.Uuid
+  signatureValid Boolean
+  rawBodySha256  String
+  payload        Json?
+  status         String    @default("RECEIVED") // RECEIVED | PROCESSED | REJECTED | DUPLICATE | FAILED
+  error          String?
+  receivedAt     DateTime  @default(now())
+  processedAt    DateTime?
+
+  @@unique([provider, deliveryId])
+  @@map("webhook_receipts")
+}
+
+model ReconciliationRun {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  tenantId   String    @db.Uuid
+  provider   String
+  status     String // RUNNING | COMPLETED | FAILED
+  stats      Json?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  exceptions ReconciliationException[]
+
+  @@unique([tenantId, id])
+  @@map("reconciliation_runs")
+}
+
+model ReconciliationException {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  tenantId    String    @db.Uuid
+  runId       String    @db.Uuid
+  operationId String?   @db.Uuid
+  kind        String // STATUS_MISMATCH | MISSING_AT_PROVIDER | UNRESOLVED_UNKNOWN
+  details     Json?
+  resolvedAt  DateTime?
+  resolvedBy  String?   @db.Uuid
+  createdAt   DateTime  @default(now())
+
+  run ReconciliationRun @relation(fields: [tenantId, runId], references: [tenantId, id], onDelete: Restrict)
+
+  @@index([tenantId, resolvedAt])
+  @@map("reconciliation_exceptions")
+}
+
+// ============================================================================ platform infrastructure
+
+model IdempotencyRecord {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  scope          String // "tenant:<id>:user:<id>" or "user:<id>"
+  key            String
+  route          String
+  requestHash    String
+  status         String   @default("IN_PROGRESS") // IN_PROGRESS | COMPLETED
+  responseStatus Int?
+  responseBody   Json?
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+
+  @@unique([scope, key])
+  @@index([expiresAt])
+  @@map("idempotency_records")
+}
+
+/// Transactional outbox: written in the same transaction as the change, dispatched to BullMQ.
+model OutboxEvent {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  tenantId    String?   @db.Uuid
+  type        String
+  payload     Json
+  dedupeKey   String?   @unique
+  status      String    @default("PENDING") // PENDING | DISPATCHED | FAILED
+  attempts    Int       @default(0)
+  availableAt DateTime  @default(now())
+  dispatchedAt DateTime?
+  lastError   String?
+  createdAt   DateTime  @default(now())
+
+  @@index([status, availableAt])
+  @@map("outbox_events")
+}
+
+model Notification {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  tenantId  String    @db.Uuid
+  userId    String?   @db.Uuid // null = all members with access
+  type      String
+  title     String
+  body      String
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([tenantId, userId, createdAt])
+  @@map("notifications")
+}
+
+model AuditEvent {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  tenantId         String?  @db.Uuid
+  actorUserId      String?  @db.Uuid
+  actorType        String // USER | ADMIN | SUPPORT | SYSTEM
+  supportSessionId String?  @db.Uuid
+  action           String
+  targetType       String?
+  targetId         String?
+  requestId        String?
+  ipHash           String?
+  data             Json?
+  createdAt        DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_events")
+}
+
+model ExportJob {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  tenantId          String    @db.Uuid
+  requestedByUserId String    @db.Uuid
+  type              String
+  params            Json
+  status            String    @default("QUEUED") // QUEUED | RUNNING | READY | FAILED | EXPIRED
+  storageKey        String?
+  rowCount          Int?
+  error             String?
+  expiresAt         DateTime?
+  createdAt         DateTime  @default(now())
+  completedAt       DateTime?
+
+  @@unique([tenantId, id])
+  @@index([tenantId, createdAt])
+  @@map("export_jobs")
+}
+
+model SupportAccessSession {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  adminUserId String    @db.Uuid
+  tenantId    String    @db.Uuid
+  reason      String
+  scope       String    @default("READ_ONLY")
+  startedAt   DateTime  @default(now())
+  expiresAt   DateTime
+  endedAt     DateTime?
+  endedBy     String?   @db.Uuid
+
+  @@index([tenantId, startedAt])
+  @@map("support_access_sessions")
+}
+
+model Announcement {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  title           String
+  body            String
+  severity        String    @default("INFO")
+  startsAt        DateTime
+  endsAt          DateTime?
+  createdByUserId String    @db.Uuid
+  createdAt       DateTime  @default(now())
+
+  @@map("announcements")
+}
+
+model PlatformSetting {
+  key             String   @id
+  value           Json
+  updatedByUserId String?  @db.Uuid
+  updatedAt       DateTime @updatedAt
+
+  @@map("platform_settings")
+}
+
+model EmailLog {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  toHash            String // SHA-256 of recipient; masked address kept for display
+  toMasked          String
+  template          String
+  status            String    @default("QUEUED") // QUEUED | SENT | FAILED
+  providerMessageId String?
+  error             String?
+  attempts          Int       @default(0)
+  createdAt         DateTime  @default(now())
+  sentAt            DateTime?
+
+  @@index([status, createdAt])
+  @@map("email_logs")
+}

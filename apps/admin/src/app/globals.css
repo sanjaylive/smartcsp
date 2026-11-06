@@ -1,0 +1,117 @@
+@import 'tailwindcss';
+
+/* Dark mode is class-based (html.dark), set before paint from the saved preference or the OS. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * CSP2All design tokens (mirrors packages/shared/src/tokens.ts). The admin console uses the same
+ * palette but denser spacing and an "Admin" marker so it is never mistaken for the shop portal.
+ */
+:root {
+  --background: #f6f7fb;
+  --surface: #ffffff;
+  --surface-muted: #eef0f7;
+  --border: #dde1ec;
+  --text: #161a2e;
+  --text-muted: #525a75;
+  --brand: #4f46e5;
+  --brand-strong: #4338ca;
+  --brand-alt: #7c3aed;
+  --on-brand: #ffffff;
+  --success: #15803d;
+  --warning: #b45309;
+  --danger: #b91c1c;
+  --info: #1d4ed8;
+  --focus: #6366f1;
+  --success-bg: #dcfce7;
+  --warning-bg: #fef3c7;
+  --danger-bg: #fee2e2;
+  --info-bg: #dbeafe;
+  --brand-bg: #e0e7ff;
+  --shadow-card: 0 1px 2px rgba(22, 26, 46, 0.06), 0 1px 3px rgba(22, 26, 46, 0.08);
+  color-scheme: light;
+}
+
+.dark {
+  --background: #0e1020;
+  --surface: #171a2e;
+  --surface-muted: #20243b;
+  --border: #2e3352;
+  --text: #eceef8;
+  --text-muted: #a3a9c7;
+  --brand: #818cf8;
+  --brand-strong: #a5b4fc;
+  --brand-alt: #a78bfa;
+  --on-brand: #0e1020;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --info: #60a5fa;
+  --focus: #a5b4fc;
+  --success-bg: #15301f;
+  --warning-bg: #3b2a12;
+  --danger-bg: #3a1824;
+  --info-bg: #1a2a4f;
+  --brand-bg: #26295a;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--background);
+  --color-surface: var(--surface);
+  --color-muted: var(--surface-muted);
+  --color-line: var(--border);
+  --color-fg: var(--text);
+  --color-fg-muted: var(--text-muted);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-alt: var(--brand-alt);
+  --color-on-brand: var(--on-brand);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-focus: var(--focus);
+  --color-success-bg: var(--success-bg);
+  --color-warning-bg: var(--warning-bg);
+  --color-danger-bg: var(--danger-bg);
+  --color-info-bg: var(--info-bg);
+  --color-brand-bg: var(--brand-bg);
+  --shadow-card: var(--shadow-card);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --font-sans: 'Inter', 'Noto Sans Devanagari', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+html,
+body {
+  background: var(--background);
+  color: var(--text);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

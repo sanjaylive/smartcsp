@@ -1,0 +1,101 @@
+# CSP2All production-style stack (single host). For managed Postgres/Redis/S3, delete those
+# services and point the env vars at the managed endpoints.
+#
+#   docker compose -f infra/docker/compose.prod.yml --env-file /etc/csp2all/prod.env up -d
+#   docker compose -f infra/docker/compose.prod.yml --env-file /etc/csp2all/prod.env run --rm migrate
+#
+# Postgres and Redis are on an internal network with NO published ports. Only Caddy (TLS) is public.
+# Migrations never run automatically on startup: the `migrate` job is run explicitly during a release.
+name: csp2all
+x-hardening: &hardening
+  read_only: true
+  security_opt: ['no-new-privileges:true']
+  cap_drop: ['ALL']
+  tmpfs: ['/tmp']
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: '20m', max-file: '5' }
+
+services:
+  api:
+    image: '${CSP2ALL_API_IMAGE:-csp2all-api:latest}'
+    <<: *hardening
+    env_file: ['${CSP2ALL_ENV_FILE:-/etc/csp2all/api.env}']
+    environment: { PORT: '4610' }
+    networks: [internal, edge]
+    depends_on: [postgres, redis]
+  worker:
+    image: '${CSP2ALL_API_IMAGE:-csp2all-api:latest}'
+    <<: *hardening
+    command: ['node', 'dist/worker.js']
+    env_file: ['${CSP2ALL_ENV_FILE:-/etc/csp2all/api.env}']
+    networks: [internal]
+    depends_on: [postgres, redis]
+  migrate:
+    image: '${CSP2ALL_API_IMAGE:-csp2all-api:latest}'
+    profiles: ['release']
+    command:
+      [
+        'sh',
+        '-c',
+        'DATABASE_URL="$$MIGRATION_DATABASE_URL" ./node_modules/.bin/prisma migrate deploy && node dist/cli/seed-reference.js',
+      ]
+    env_file: ['${CSP2ALL_ENV_FILE:-/etc/csp2all/api.env}']
+    networks: [internal]
+    depends_on: [postgres]
+  web:
+    image: '${CSP2ALL_WEB_IMAGE:-csp2all-web:latest}'
+    <<: *hardening
+    environment: { API_URL: 'http://api:4610', PORT: '3000' }
+    networks: [edge]
+  admin:
+    image: '${CSP2ALL_ADMIN_IMAGE:-csp2all-admin:latest}'
+    <<: *hardening
+    environment: { API_URL: 'http://api:4610', PORT: '3000' }
+    networks: [edge]
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports: ['80:80', '443:443']
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+    networks: [edge]
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_superuser_password
+      CSP2ALL_OWNER_PASSWORD_FILE: /run/secrets/pg_owner_password
+      CSP2ALL_APP_PASSWORD_FILE: /run/secrets/pg_app_password
+    secrets: [pg_superuser_password, pg_owner_password, pg_app_password]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init-prod:/docker-entrypoint-initdb.d:ro
+    networks: [internal]
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes', '--requirepass', '${REDIS_PASSWORD}']
+    volumes: [redisdata:/data]
+    networks: [internal]
+
+networks:
+  internal: { internal: true }
+  edge: {}
+
+volumes:
+  pgdata:
+  redisdata:
+  caddy_data:
+
+secrets:
+  pg_superuser_password: { file: /etc/csp2all/secrets/pg_superuser_password }
+  pg_owner_password: { file: /etc/csp2all/secrets/pg_owner_password }
+  pg_app_password: { file: /etc/csp2all/secrets/pg_app_password }
