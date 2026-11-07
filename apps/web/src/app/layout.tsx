@@ -1,19 +1,13 @@
 import type { Metadata, Viewport } from 'next';
 import { cookies } from 'next/headers';
-import { Inter, Sora } from 'next/font/google';
+// Self-hosted font files (bundled, served from 'self' — CSP-safe, and no build-time network fetch
+// like next/font/google needs). The @font-face families are referenced from globals.css.
+import '@fontsource-variable/inter';
+import '@fontsource-variable/sora';
 import type { Locale } from '@csp2all/shared';
 import { Providers } from '@/components/providers';
 import type { ThemePref } from '@/lib/theme';
 import './globals.css';
-
-// Self-hosted at build time (next/font) so the strict CSP `font-src 'self'` still holds.
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
-const sora = Sora({
-  subsets: ['latin'],
-  weight: ['600', '700', '800'],
-  variable: '--font-sora',
-  display: 'swap',
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://smart-outlet.in'),
@@ -41,7 +35,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html
       lang={locale}
       data-theme={theme === 'system' ? undefined : theme}
-      className={`${inter.variable} ${sora.variable}`}
       suppressHydrationWarning
     >
       <body className="min-h-dvh antialiased">
