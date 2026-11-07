@@ -302,6 +302,31 @@
   }
 }
 
+/*
+ * Marketing homepage identity: warm off-white, charcoal text, brick red. Light only, scoped to the
+ * landing subtree by redefining the colour tokens — so the app and admin keep their own theme.
+ */
+.mk {
+  --bg: #faf8f3;
+  --surface: #ffffff;
+  --surface-muted: #f3eee6;
+  --fg: #22201d;
+  --fg-muted: #6f6558;
+  --border: #e8e0d5;
+  --brand: #b53927;
+  --brand-strong: #9a2f1e;
+  --brand-alt: #b53927;
+  --brand-bg: #fbece5;
+  --on-brand: #ffffff;
+  --success: #2f7d53;
+  --success-bg: #e4f0e8;
+  --warning: #b2701a;
+  --warning-bg: #f7ecd9;
+  color-scheme: light;
+  background: var(--bg);
+  color: var(--fg);
+}
+
 /* A single faint brand wash at the top of the hero — flat and clean, no multi-colour mesh. */
 .aurora {
   position: absolute;

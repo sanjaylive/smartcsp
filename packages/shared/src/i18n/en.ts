@@ -535,6 +535,21 @@ export const en = {
   'landing.stats.s3l': 'Languages: Hindi & English',
   'landing.stats.s4v': '100%',
   'landing.stats.s4l': 'Works offline',
+  'landing.demo': 'Demo',
+  'landing.seeHow': 'See how it works',
+  'landing.screen.newRecord': 'New record',
+  'landing.screen.service': 'Service',
+  'landing.screen.amount': 'Amount',
+  'landing.screen.mobile': 'Customer mobile',
+  'landing.screen.account': 'Account (last 4)',
+  'landing.screen.save': 'Save record',
+  'landing.screen.expense': 'Shop expense',
+  'landing.screen.expectedInDrawer': 'Expected in drawer',
+  'landing.screen.dues': 'Pending dues',
+  'landing.screen.collect': 'Collect',
+  'landing.work.1': 'Aadhaar and card numbers are blocked at entry.',
+  'landing.work.2': 'Close the day and match the cash in your drawer.',
+  'landing.work.3': 'Take part-payments and track who still owes you.',
 } as const;
 
 export type TranslationKey = keyof typeof en;
