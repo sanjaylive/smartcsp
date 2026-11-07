@@ -21,22 +21,27 @@ import {
 } from 'lucide-react';
 import { SERVICE_CODES } from '@csp2all/shared';
 import { useI18n } from '@/lib/i18n';
+import { useBrand } from '@/lib/brand';
 import { ServiceIcon, useServiceLabel } from '@/components/service';
 import { LanguageToggle, ThemeToggle } from '@/components/toggles';
 
-const BRAND = 'Smart Outlet';
-
-/* A compact wordmark built from the shared brand tokens (no CSP2All lockup here — this is public). */
+/* Public wordmark, driven by the configured brand (name + optional logo). */
 function BrandMark() {
+  const brand = useBrand();
   return (
     <Link href="/" className="inline-flex items-center gap-2.5 rounded-lg font-display">
       <span
         aria-hidden
-        className="grid size-9 place-items-center rounded-xl bg-brand text-on-brand shadow-[0_6px_20px_-6px_var(--brand)]"
+        className="grid size-9 place-items-center overflow-hidden rounded-xl bg-brand text-on-brand shadow-[0_6px_20px_-6px_var(--brand)]"
       >
-        <WalletMinimal className="size-5" strokeWidth={2.4} />
+        {brand.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={brand.logoUrl} alt="" className="size-full object-contain" />
+        ) : (
+          <WalletMinimal className="size-5" strokeWidth={2.4} />
+        )}
       </span>
-      <span className="text-lg font-extrabold tracking-tight">{BRAND}</span>
+      <span className="text-lg font-extrabold tracking-tight">{brand.name}</span>
     </Link>
   );
 }
@@ -102,11 +107,7 @@ function ProductPreview() {
   ] as const;
   return (
     <div className="relative">
-      <div
-        aria-hidden
-        className="absolute -inset-4 -z-10 rounded-[2rem] bg-gradient-to-tr from-brand/25 via-brand-alt/20 to-transparent blur-2xl"
-      />
-      <div className="card overflow-hidden rounded-[1.5rem] p-0 ring-1 ring-black/5">
+      <div className="card overflow-hidden rounded-[1.5rem] p-0 shadow-[0_24px_60px_-28px_rgba(22,26,46,0.3)]">
         <div className="flex items-center justify-between border-b border-border bg-surface-muted/60 px-5 py-3">
           <div className="flex items-center gap-2">
             <span className="size-3 rounded-full bg-danger/70" />
@@ -191,7 +192,6 @@ function Hero() {
   return (
     <section className="relative overflow-hidden">
       <div aria-hidden className="aurora" />
-      <div aria-hidden className="bg-grid absolute inset-0 -z-10" />
       <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:py-24">
         <div className="animate-rise">
           <p className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-sm font-semibold text-brand-strong backdrop-blur">
@@ -200,9 +200,7 @@ function Hero() {
           </p>
           <h1 className="mt-5 font-display text-[2.6rem] font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
             {t('landing.hero.title')}{' '}
-            <span className="bg-gradient-to-r from-brand to-brand-alt bg-clip-text text-transparent">
-              {t('landing.hero.titleEm')}
-            </span>
+            <span className="text-brand">{t('landing.hero.titleEm')}</span>
           </h1>
           <p className="mt-5 max-w-xl text-lg text-fg-muted">{t('landing.hero.sub')}</p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -279,10 +277,6 @@ function Features() {
               key={n}
               className="group relative overflow-hidden rounded-2xl border border-border bg-surface p-6 transition hover:shadow-card"
             >
-              <div
-                aria-hidden
-                className="absolute right-0 top-0 size-24 translate-x-8 -translate-y-8 rounded-full bg-brand/10 blur-2xl transition group-hover:bg-brand/20"
-              />
               <span className="grid size-11 place-items-center rounded-xl bg-brand-bg text-brand-strong">
                 <Icon className="size-5.5" strokeWidth={2.1} />
               </span>
@@ -495,6 +489,7 @@ function FinalCta() {
 
 function Footer() {
   const { t } = useI18n();
+  const brand = useBrand();
   return (
     <footer className="border-t border-border bg-surface">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:grid-cols-2 lg:grid-cols-4">
@@ -552,7 +547,7 @@ function Footer() {
         <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-6 text-xs text-fg-muted sm:flex-row sm:items-center sm:justify-between">
           <p className="max-w-2xl">{t('landing.footer.independent')}</p>
           <p>
-            © {new Date().getFullYear()} {BRAND}. {t('landing.footer.rights')}
+            © {new Date().getFullYear()} {brand.name}. {t('landing.footer.rights')}
           </p>
         </div>
       </div>

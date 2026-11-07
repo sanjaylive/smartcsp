@@ -5,6 +5,7 @@ import { Languages, Moon, Sun } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { isDark, useTheme } from '@/lib/theme';
+import { useBrand } from '@/lib/brand';
 import { cn } from '@/lib/cn';
 
 export function LanguageToggle({ className }: { className?: string }) {
@@ -49,6 +50,7 @@ export function ThemeToggle({ className }: { className?: string }) {
 }
 
 export function Logo({ href = '/', compact }: { href?: string; compact?: boolean }) {
+  const brand = useBrand();
   return (
     <Link
       href={href}
@@ -56,14 +58,19 @@ export function Logo({ href = '/', compact }: { href?: string; compact?: boolean
     >
       <span
         aria-hidden
-        className="inline-flex size-9 items-center justify-center rounded-xl bg-brand text-on-brand text-sm"
+        className="inline-flex size-9 items-center justify-center overflow-hidden rounded-xl bg-brand text-sm text-on-brand"
       >
-        C2
+        {brand.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={brand.logoUrl} alt="" className="size-full object-contain" />
+        ) : (
+          (brand.name[0] ?? 'S').toUpperCase()
+        )}
       </span>
       {!compact ? (
-        <span className="text-lg">CSP2All</span>
+        <span className="text-lg">{brand.name}</span>
       ) : (
-        <span className="sr-only">CSP2All</span>
+        <span className="sr-only">{brand.name}</span>
       )}
     </Link>
   );

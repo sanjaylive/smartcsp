@@ -78,23 +78,20 @@ function SettingsInner() {
       <QueryState query={q}>
         {(d) => {
           const val = (k: string) => d.items.find((i) => i.key === k);
+          const known = ['dataRetention', 'signupsEnabled', 'supportContact', 'brand'];
           return (
             <div className="grid gap-4 xl:grid-cols-2">
-              <RetentionCard setting={val('dataRetention')} editable={editable} />
+              <BrandCard setting={val('brand')} editable={editable} />
               <div className="flex flex-col gap-4">
                 <SignupsCard setting={val('signupsEnabled')} editable={editable} />
                 <SupportContactCard setting={val('supportContact')} editable={editable} />
               </div>
-              {d.items.filter(
-                (i) => !['dataRetention', 'signupsEnabled', 'supportContact'].includes(i.key),
-              ).length > 0 && (
+              <RetentionCard setting={val('dataRetention')} editable={editable} />
+              {d.items.filter((i) => !known.includes(i.key)).length > 0 && (
                 <Card title="Other settings (read-only)" className="xl:col-span-2">
                   <pre className="overflow-auto font-mono text-[12px]">
                     {JSON.stringify(
-                      d.items.filter(
-                        (i) =>
-                          !['dataRetention', 'signupsEnabled', 'supportContact'].includes(i.key),
-                      ),
+                      d.items.filter((i) => !known.includes(i.key)),
                       null,
                       2,
                     )}
@@ -202,6 +199,172 @@ function RetentionCard({ setting, editable }: { setting?: PlatformSetting; edita
         )}
       </form>
       {dialog}
+    </Card>
+  );
+}
+
+const BRAND_DEFAULTS = {
+  name: 'Smart Outlet',
+  tagline: '',
+  supportEmail: '',
+  supportPhone: '',
+  primaryColor: '#4F46E5',
+  logoUrl: '',
+};
+
+function BrandCard({ setting, editable }: { setting?: PlatformSetting; editable: boolean }) {
+  const current = { ...BRAND_DEFAULTS, ...((setting?.value ?? {}) as Record<string, string>) };
+  const [form, setForm] = useState<Record<string, string>>(current);
+  const save = useSave('brand', 'Branding');
+  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const err = (k: string) => (isApiError(save.error) ? save.error.field(`value.${k}`) : undefined);
+  const colorOk = /^#[0-9a-fA-F]{6}$/.test(form.primaryColor);
+  return (
+    <Card title="Branding" actions={<Updated s={setting} />} className="xl:col-span-2">
+      <form
+        className="flex flex-col gap-4"
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!form.name.trim() || !colorOk) return;
+          save.mutate({
+            name: form.name.trim(),
+            tagline: form.tagline.trim(),
+            supportEmail: form.supportEmail.trim(),
+            supportPhone: form.supportPhone.trim(),
+            primaryColor: form.primaryColor,
+            logoUrl: form.logoUrl.trim(),
+          });
+        }}
+      >
+        <p className="text-[13px] text-fg-muted">
+          The product name, logo, support details and accent colour shown across the tenant app, the
+          admin console and the public site. Changes take effect within a minute.
+        </p>
+        <div className="flex items-center gap-4 rounded-xl border border-border bg-surface-muted/40 p-4">
+          <span
+            aria-hidden
+            className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl text-lg font-extrabold text-white"
+            style={{ background: colorOk ? form.primaryColor : '#4F46E5' }}
+          >
+            {form.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={form.logoUrl} alt="" className="size-full object-contain" />
+            ) : (
+              (form.name.trim()[0] ?? 'S').toUpperCase()
+            )}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-lg font-extrabold tracking-tight">
+              {form.name.trim() || 'Smart Outlet'}
+            </p>
+            {form.tagline.trim() && (
+              <p className="truncate text-sm text-fg-muted">{form.tagline.trim()}</p>
+            )}
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Brand name" required error={err('name')}>
+            {(p) => (
+              <Input
+                {...p}
+                value={form.name}
+                maxLength={40}
+                disabled={!editable}
+                onChange={(e) => set('name', e.target.value)}
+              />
+            )}
+          </Field>
+          <Field label="Tagline" hint="Short line under the name" error={err('tagline')}>
+            {(p) => (
+              <Input
+                {...p}
+                value={form.tagline}
+                maxLength={80}
+                disabled={!editable}
+                onChange={(e) => set('tagline', e.target.value)}
+              />
+            )}
+          </Field>
+          <Field label="Support email" error={err('supportEmail')}>
+            {(p) => (
+              <Input
+                {...p}
+                type="email"
+                value={form.supportEmail}
+                disabled={!editable}
+                onChange={(e) => set('supportEmail', e.target.value)}
+              />
+            )}
+          </Field>
+          <Field label="Support phone" error={err('supportPhone')}>
+            {(p) => (
+              <Input
+                {...p}
+                value={form.supportPhone}
+                maxLength={20}
+                disabled={!editable}
+                onChange={(e) => set('supportPhone', e.target.value)}
+              />
+            )}
+          </Field>
+          <Field
+            label="Accent colour"
+            hint="Hex, e.g. #4F46E5"
+            error={err('primaryColor') ?? (!colorOk ? 'Use a hex colour like #4F46E5' : undefined)}
+          >
+            {(p) => (
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  aria-label="Accent colour picker"
+                  value={colorOk ? form.primaryColor : '#4F46E5'}
+                  disabled={!editable}
+                  onChange={(e) => set('primaryColor', e.target.value)}
+                  className="size-11 shrink-0 cursor-pointer rounded-lg border border-border bg-surface"
+                />
+                <Input
+                  {...p}
+                  value={form.primaryColor}
+                  maxLength={7}
+                  disabled={!editable}
+                  onChange={(e) => set('primaryColor', e.target.value)}
+                />
+              </div>
+            )}
+          </Field>
+          <Field
+            label="Logo URL"
+            hint="Square PNG/SVG on a transparent background"
+            error={err('logoUrl')}
+          >
+            {(p) => (
+              <Input
+                {...p}
+                type="url"
+                inputMode="url"
+                value={form.logoUrl}
+                disabled={!editable}
+                placeholder="https://…"
+                onChange={(e) => set('logoUrl', e.target.value)}
+              />
+            )}
+          </Field>
+        </div>
+        <FormError error={save.error} />
+        {editable && (
+          <div>
+            <Button
+              type="submit"
+              variant="primary"
+              loading={save.isPending}
+              disabled={!form.name.trim() || !colorOk}
+            >
+              Save branding
+            </Button>
+          </div>
+        )}
+      </form>
     </Card>
   );
 }

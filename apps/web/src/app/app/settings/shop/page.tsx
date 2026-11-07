@@ -63,7 +63,7 @@ function ProfileForm({ p, reload }: { p: TenantProfile; reload: () => void }) {
     district: p.district ?? '',
     address: p.address ?? '',
     preferredLanguage: p.preferredLanguage,
-    brandColor: p.brandColor ?? '#4F46E5',
+    brandColor: p.brandColor ?? '#DC2626',
     receiptFooter: p.receiptFooter ?? '',
   });
   const [busy, setBusy] = useState(false);

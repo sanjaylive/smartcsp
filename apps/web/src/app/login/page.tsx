@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, BookOpenCheck, Mail, ShieldCheck, WalletMinimal, WifiOff } from 'lucide-react';
 import { otpRequestSchema } from '@csp2all/shared';
+import { useBrand } from '@/lib/brand';
 import { LanguageToggle, ThemeToggle } from '@/components/toggles';
 import { Alert, Button, Checkbox, Field, Input } from '@/components/ui';
 import { OtpInput } from '@/components/otp-input';
@@ -15,22 +16,26 @@ import { errorMessage, qk } from '@/lib/hooks';
 import { useI18n } from '@/lib/i18n';
 import type { Me, OtpChallenge } from '@/lib/types';
 
-const BRAND = 'Smart Outlet';
-
 function BrandMark({ onBrand }: { onBrand?: boolean }) {
+  const brand = useBrand();
   return (
     <Link href="/" className="inline-flex items-center gap-2.5 font-display">
       <span
         aria-hidden
         className={
           onBrand
-            ? 'grid size-9 place-items-center rounded-xl bg-on-brand/15 text-on-brand'
-            : 'grid size-9 place-items-center rounded-xl bg-brand text-on-brand shadow-[0_6px_20px_-6px_var(--brand)]'
+            ? 'grid size-9 place-items-center overflow-hidden rounded-xl bg-on-brand/15 text-on-brand'
+            : 'grid size-9 place-items-center overflow-hidden rounded-xl bg-brand text-on-brand shadow-[0_6px_20px_-6px_var(--brand)]'
         }
       >
-        <WalletMinimal className="size-5" strokeWidth={2.4} />
+        {brand.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={brand.logoUrl} alt="" className="size-full object-contain" />
+        ) : (
+          <WalletMinimal className="size-5" strokeWidth={2.4} />
+        )}
       </span>
-      <span className="text-lg font-extrabold tracking-tight">{BRAND}</span>
+      <span className="text-lg font-extrabold tracking-tight">{brand.name}</span>
     </Link>
   );
 }

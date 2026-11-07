@@ -5,16 +5,19 @@ import { useState, type ReactNode } from 'react';
 import type { Locale } from '@csp2all/shared';
 import { I18nProvider } from '@/lib/i18n';
 import { ThemeProvider, type ThemePref } from '@/lib/theme';
+import { BrandProvider, BRAND_DEFAULTS, type Brand } from '@/lib/brand';
 import { isApiError } from '@/lib/api';
 import { ToastProvider } from './ui/toast';
 
 export function Providers({
   locale,
   theme,
+  brand = BRAND_DEFAULTS,
   children,
 }: {
   locale: Locale;
   theme: ThemePref;
+  brand?: Brand;
   children: ReactNode;
 }) {
   const [client] = useState(
@@ -37,9 +40,11 @@ export function Providers({
   return (
     <ThemeProvider initialTheme={theme}>
       <I18nProvider initialLocale={locale}>
-        <QueryClientProvider client={client}>
-          <ToastProvider>{children}</ToastProvider>
-        </QueryClientProvider>
+        <BrandProvider brand={brand}>
+          <QueryClientProvider client={client}>
+            <ToastProvider>{children}</ToastProvider>
+          </QueryClientProvider>
+        </BrandProvider>
       </I18nProvider>
     </ThemeProvider>
   );

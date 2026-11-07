@@ -41,6 +41,7 @@ describe('route access policies', () => {
         'AuthController.verifyOtp',
         'HealthController.health',
         'HealthController.metrics',
+        'HealthController.publicConfig',
         'HealthController.ready',
         'IntegrationsController.webhook',
       ].sort(),

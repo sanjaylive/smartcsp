@@ -12,6 +12,15 @@ export interface EmailMessage {
   text: string;
   html?: string;
   template: string;
+  /** Overrides EMAIL_FROM's display name with the configured brand (set at delivery time). */
+  from?: string;
+}
+
+/** Replace the display name in EMAIL_FROM with the brand name, keeping the address. */
+export function composeFrom(brandName: string, emailFrom: string): string {
+  const m = emailFrom.match(/<([^>]+)>/);
+  const address = (m ? m[1] : emailFrom).trim();
+  return `${brandName} <${address}>`;
 }
 
 /** In-memory driver for automated tests. */
@@ -35,7 +44,7 @@ class SmtpDriver implements EmailDriver {
   }
   async send(msg: EmailMessage) {
     const r = await this.transport.sendMail({
-      from: config().EMAIL_FROM,
+      from: msg.from ?? config().EMAIL_FROM,
       to: msg.to,
       subject: msg.subject,
       text: msg.text,
@@ -101,8 +110,27 @@ export class EmailService implements OnModuleInit {
     });
   }
 
+  private brandCache?: { name: string; at: number };
+  /** Brand display name for the From header, cached for 60s. */
+  private async brandName(): Promise<string> {
+    if (this.brandCache && Date.now() - this.brandCache.at < 60_000) return this.brandCache.name;
+    let name = 'Smart Outlet';
+    try {
+      const row = await this.db.asSystem((tx) =>
+        tx.platformSetting.findUnique({ where: { key: 'brand' } }),
+      );
+      const v = row?.value as Record<string, unknown> | undefined;
+      if (v && typeof v.name === 'string' && v.name.trim()) name = v.name.trim();
+    } catch {
+      // fall back to the default brand name
+    }
+    this.brandCache = { name, at: Date.now() };
+    return name;
+  }
+
   private async deliver(logId: string, msg: EmailMessage) {
     try {
+      if (!msg.from) msg.from = composeFrom(await this.brandName(), config().EMAIL_FROM);
       const r = await this.driver.send(msg);
       await this.db.emailLog.update({
         where: { id: logId },

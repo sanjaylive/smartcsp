@@ -1,6 +1,7 @@
 import { Controller, Get, Injectable, NestMiddleware, Req, Res } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 import { Public } from '../../common/access';
+import { BRAND_DEFAULTS } from '../admin/admin.controller';
 import { Db } from '../../common/db';
 import { RedisService } from '../../common/redis';
 import { AppError } from '../../common/errors';
@@ -61,6 +62,40 @@ export class HealthController {
     const ok = Object.values(checks).every((v) => v === 'ok');
     res.status(ok ? 200 : 503);
     return { status: ok ? 'ready' : 'not_ready', checks };
+  }
+
+  /** Public, cacheable brand + config for the web/admin apps and the landing page. */
+  @Get('v1/public/config')
+  @Public()
+  @ApiDoc({ summary: 'Public branding and configuration', tags: ['Operations'] })
+  async publicConfig() {
+    return this.db.asSystem(async (tx) => {
+      const rows = await tx.platformSetting.findMany({
+        where: { key: { in: ['brand', 'signupsEnabled'] } },
+      });
+      const brand = (rows.find((r) => r.key === 'brand')?.value ?? {}) as Record<string, unknown>;
+      const signups = rows.find((r) => r.key === 'signupsEnabled');
+      return {
+        brand: {
+          name: typeof brand.name === 'string' && brand.name ? brand.name : BRAND_DEFAULTS.name,
+          tagline: typeof brand.tagline === 'string' ? brand.tagline : BRAND_DEFAULTS.tagline,
+          supportEmail:
+            typeof brand.supportEmail === 'string'
+              ? brand.supportEmail
+              : BRAND_DEFAULTS.supportEmail,
+          supportPhone:
+            typeof brand.supportPhone === 'string'
+              ? brand.supportPhone
+              : BRAND_DEFAULTS.supportPhone,
+          primaryColor:
+            typeof brand.primaryColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(brand.primaryColor)
+              ? brand.primaryColor
+              : BRAND_DEFAULTS.primaryColor,
+          logoUrl: typeof brand.logoUrl === 'string' ? brand.logoUrl : BRAND_DEFAULTS.logoUrl,
+        },
+        signupsEnabled: signups ? signups.value === true : true,
+      };
+    });
   }
 
   /** Protect with METRICS_TOKEN and/or expose only on the internal network. */

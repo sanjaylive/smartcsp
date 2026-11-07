@@ -13,20 +13,20 @@
   --border: #dde1ec;
   --fg: #161a2e;
   --fg-muted: #525a75;
-  --brand: #4f46e5;
-  --brand-strong: #4338ca;
-  --brand-alt: #7c3aed;
+  --brand: #dc2626;
+  --brand-strong: #b91c1c;
+  --brand-alt: #ea580c;
   --on-brand: #ffffff;
   --success: #15803d;
   --warning: #b45309;
   --danger: #b91c1c;
   --info: #1d4ed8;
-  --focus: #6366f1;
+  --focus: #ef4444;
   --success-bg: #dcfce7;
   --warning-bg: #fef3c7;
   --danger-bg: #fee2e2;
   --info-bg: #dbeafe;
-  --brand-bg: #e0e7ff;
+  --brand-bg: #fee2e2;
   --shadow-card: 0 1px 2px rgba(22, 26, 46, 0.06), 0 1px 3px rgba(22, 26, 46, 0.08);
   color-scheme: light;
 }
@@ -38,20 +38,20 @@
   --border: #2e3352;
   --fg: #eceef8;
   --fg-muted: #a3a9c7;
-  --brand: #818cf8;
-  --brand-strong: #a5b4fc;
-  --brand-alt: #a78bfa;
+  --brand: #f87171;
+  --brand-strong: #fca5a5;
+  --brand-alt: #fb923c;
   --on-brand: #0e1020;
   --success: #4ade80;
   --warning: #fbbf24;
   --danger: #f87171;
   --info: #60a5fa;
-  --focus: #a5b4fc;
+  --focus: #fca5a5;
   --success-bg: #15301f;
   --warning-bg: #3b2a12;
   --danger-bg: #3a1820;
   --info-bg: #1a2a4f;
-  --brand-bg: #26295a;
+  --brand-bg: #3a1d1d;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
   color-scheme: dark;
 }
@@ -64,20 +64,20 @@
     --border: #2e3352;
     --fg: #eceef8;
     --fg-muted: #a3a9c7;
-    --brand: #818cf8;
-    --brand-strong: #a5b4fc;
-    --brand-alt: #a78bfa;
+    --brand: #f87171;
+    --brand-strong: #fca5a5;
+    --brand-alt: #fb923c;
     --on-brand: #0e1020;
     --success: #4ade80;
     --warning: #fbbf24;
     --danger: #f87171;
     --info: #60a5fa;
-    --focus: #a5b4fc;
+    --focus: #fca5a5;
     --success-bg: #15301f;
     --warning-bg: #3b2a12;
     --danger-bg: #3a1820;
     --info-bg: #1a2a4f;
-    --brand-bg: #26295a;
+    --brand-bg: #3a1d1d;
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
     color-scheme: dark;
   }
@@ -302,31 +302,18 @@
   }
 }
 
-/* Soft aurora glow behind the hero / CTA band. */
+/* A single faint brand wash at the top of the hero — flat and clean, no multi-colour mesh. */
 .aurora {
   position: absolute;
-  inset: -20% -10% auto -10%;
-  height: 130%;
+  inset: -30% -10% auto -10%;
+  height: 80%;
   z-index: -10;
   pointer-events: none;
-  background:
-    radial-gradient(
-      40% 55% at 15% 10%,
-      color-mix(in srgb, var(--brand) 42%, transparent),
-      transparent 70%
-    ),
-    radial-gradient(
-      38% 50% at 85% 0%,
-      color-mix(in srgb, var(--brand-alt) 38%, transparent),
-      transparent 70%
-    ),
-    radial-gradient(
-      45% 60% at 60% 90%,
-      color-mix(in srgb, var(--info) 24%, transparent),
-      transparent 70%
-    );
-  filter: blur(28px);
-  opacity: 0.55;
+  background: radial-gradient(
+    60% 65% at 50% 0%,
+    color-mix(in srgb, var(--brand) 10%, transparent),
+    transparent 72%
+  );
 }
 .aurora-on-brand {
   inset: 0;

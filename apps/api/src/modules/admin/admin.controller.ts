@@ -80,7 +80,28 @@ const SETTINGS: Record<string, z.ZodType> = {
   }),
   signupsEnabled: z.boolean(),
   supportContact: z.object({ email: z.email(), hours: z.string().max(100) }),
+  brand: z.object({
+    name: z.string().trim().min(1).max(40),
+    tagline: z.string().trim().max(80).default(''),
+    supportEmail: z.union([z.email(), z.literal('')]).default(''),
+    supportPhone: z.string().trim().max(20).default(''),
+    primaryColor: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/, 'Use a hex colour like #DC2626')
+      .default('#DC2626'),
+    logoUrl: z.union([z.string().url().max(500), z.literal('')]).default(''),
+  }),
 };
+
+/** Public brand/config defaults (used when no `brand` setting has been saved yet). */
+export const BRAND_DEFAULTS = {
+  name: 'Smart Outlet',
+  tagline: '',
+  supportEmail: '',
+  supportPhone: '',
+  primaryColor: '#DC2626',
+  logoUrl: '',
+} as const;
 
 @Controller('v1/admin')
 export class AdminController {

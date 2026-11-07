@@ -1,39 +1,47 @@
 import type { Metadata } from 'next';
 import { LandingContent } from '@/components/landing';
+import { getPublicConfig } from '@/lib/config';
 
 const SITE = 'https://smart-outlet.in';
-const NAME = 'Smart Outlet';
-const TITLE = 'Smart Outlet — Records, cashbook & dues for your CSP counter';
-const DESC =
-  'Smart Outlet records every AEPS, DMT, PAN and recharge in seconds, keeps your cashbook tallied, and tracks every due — on any phone, even offline. An independent tool for CSP and Grahak Seva Kendra counters.';
+const titleFor = (name: string) => `${name} — Records, cashbook & dues for your CSP counter`;
+const descFor = (name: string) =>
+  `${name} records every AEPS, DMT, PAN and recharge in seconds, keeps your cashbook tallied, and tracks every due — on any phone, even offline. An independent tool for CSP and Grahak Seva Kendra counters.`;
 
-export const metadata: Metadata = {
-  title: { absolute: TITLE },
-  description: DESC,
-  keywords: [
-    'CSP software',
-    'Grahak Seva Kendra',
-    'AEPS record keeping',
-    'DMT register',
-    'retailer cashbook',
-    'CSP counter app',
-    'customer service point',
-    'kiosk banking records',
-    'recharge PAN AEPS register',
-    'offline shop ledger',
-  ],
-  alternates: { canonical: '/' },
-  robots: { index: true, follow: true },
-  openGraph: {
-    type: 'website',
-    url: SITE,
-    siteName: NAME,
-    title: TITLE,
+export async function generateMetadata(): Promise<Metadata> {
+  const { brand } = await getPublicConfig();
+  const NAME = brand.name;
+  const TITLE = titleFor(NAME);
+  const DESC = descFor(NAME);
+  return {
+    title: { absolute: TITLE },
     description: DESC,
-    locale: 'en_IN',
-  },
-  twitter: { card: 'summary_large_image', title: TITLE, description: DESC },
-};
+    keywords: KEYWORDS,
+    alternates: { canonical: '/' },
+    robots: { index: true, follow: true },
+    openGraph: {
+      type: 'website',
+      url: SITE,
+      siteName: NAME,
+      title: TITLE,
+      description: DESC,
+      locale: 'en_IN',
+    },
+    twitter: { card: 'summary_large_image', title: TITLE, description: DESC },
+  };
+}
+
+const KEYWORDS = [
+  'CSP software',
+  'Grahak Seva Kendra',
+  'AEPS record keeping',
+  'DMT register',
+  'retailer cashbook',
+  'CSP counter app',
+  'customer service point',
+  'kiosk banking records',
+  'recharge PAN AEPS register',
+  'offline shop ledger',
+];
 
 const FAQ = [
   ['q1', 'a1'],
@@ -60,50 +68,53 @@ const FAQ_TEXT: Record<string, string> = {
   a6: 'Yes. Switch between Hindi and English anytime from the top of any screen.',
 };
 
-const jsonLd = {
-  '@context': 'https://schema.org',
-  '@graph': [
-    {
-      '@type': 'Organization',
-      '@id': `${SITE}/#org`,
-      name: NAME,
-      url: SITE,
-      description: DESC,
-    },
-    {
-      '@type': 'WebSite',
-      '@id': `${SITE}/#website`,
-      url: SITE,
-      name: NAME,
-      publisher: { '@id': `${SITE}/#org` },
-      inLanguage: ['en-IN', 'hi-IN'],
-    },
-    {
-      '@type': 'SoftwareApplication',
-      name: NAME,
-      applicationCategory: 'BusinessApplication',
-      operatingSystem: 'Web, Android',
-      offers: { '@type': 'Offer', price: '0', priceCurrency: 'INR' },
-      description: DESC,
-    },
-    {
-      '@type': 'FAQPage',
-      mainEntity: FAQ.map(([q, a]) => ({
-        '@type': 'Question',
-        name: FAQ_TEXT[q],
-        acceptedAnswer: { '@type': 'Answer', text: FAQ_TEXT[a] },
-      })),
-    },
-  ],
-};
+function jsonLdFor(name: string) {
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': `${SITE}/#org`,
+        name,
+        url: SITE,
+        description: descFor(name),
+      },
+      {
+        '@type': 'WebSite',
+        '@id': `${SITE}/#website`,
+        url: SITE,
+        name,
+        publisher: { '@id': `${SITE}/#org` },
+        inLanguage: ['en-IN', 'hi-IN'],
+      },
+      {
+        '@type': 'SoftwareApplication',
+        name,
+        applicationCategory: 'BusinessApplication',
+        operatingSystem: 'Web, Android',
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'INR' },
+        description: descFor(name),
+      },
+      {
+        '@type': 'FAQPage',
+        mainEntity: FAQ.map(([q, a]) => ({
+          '@type': 'Question',
+          name: FAQ_TEXT[q],
+          acceptedAnswer: { '@type': 'Answer', text: FAQ_TEXT[a] },
+        })),
+      },
+    ],
+  };
+}
 
-export default function Page() {
+export default async function Page() {
+  const { brand } = await getPublicConfig();
   return (
     <>
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdFor(brand.name)) }}
       />
       <LandingContent />
     </>
