@@ -41,6 +41,21 @@ _Last verified: 06 Nov 2026 on macOS (Node 26.13, pnpm 10.34, Docker 29.9, Flutt
 
 The GitHub Actions workflow (`.github/workflows/ci.yml`) has **not** been executed (no remote configured).
 
+### Re-run on 07 Nov 2026
+
+Re-ran shared tests (9 passed), API tests (9 suites, 109 passed), api/web/admin typecheck + lint (clean),
+`prettier --check .` (clean), web/admin `build` (success), web Playwright (15 passed), admin Playwright
+(11 passed), `flutter analyze` (no issues) and `flutter test` (55 passed) — all matching the table above.
+
+The Flutter live API check **failed** on its first re-run: it re-presented a spent refresh token a few seconds after
+use and expected revocation, but the API deliberately accepts reuse within `REFRESH_REUSE_GRACE_MS` (30 s, for lost
+responses). The earlier "passed" result for this check could not have held with that code. The test now waits out the
+grace window before asserting reuse → session revoked, and passes (~32 s). Replay inside the window remains covered by
+`apps/api/test/integration/auth.test.ts`.
+
+Not re-run on 07 Nov: migration drift (`SHADOW_DATABASE_URL` not set in `apps/api/.env`), Docker image builds,
+APK builds and the iOS build (still no Xcode/CocoaPods).
+
 ## Acceptance flow coverage
 
 Steps 1–16 run in `apps/web/e2e/acceptance.spec.ts` (register via OTP, create shop, select AEPS/DMT/PAN, dashboard,

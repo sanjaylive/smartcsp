@@ -167,7 +167,13 @@ void main() {
     final sessions = await api.sessions();
     expect(sessions.any((s) => s.current && s.kind == 'MOBILE'), isTrue);
 
-    // ---- refresh-token reuse detection: presenting the spent token revokes the session
+    // ---- refresh-token reuse detection: presenting the spent token revokes the session.
+    // The API accepts a just-used token for a short grace window (REFRESH_REUSE_GRACE_MS = 30s in
+    // apps/api/src/modules/auth/session.service.ts) so a lost response can be retried; that replay
+    // is covered by the API integration tests. Reuse after the window is theft, so wait it out.
+    const reuseGrace = Duration(seconds: 30);
+    log('Waiting ${reuseGrace.inSeconds + 2}s for the refresh-token reuse grace window to pass…');
+    await Future<void>.delayed(reuseGrace + const Duration(seconds: 2));
     try {
       await realRefresh(refreshCalls.first);
       fail('reused refresh token accepted');
