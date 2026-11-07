@@ -60,7 +60,9 @@ services:
     command: ['node', 'dist/worker.js']
     # The image HEALTHCHECK probes the API's HTTP port; the worker serves none (a dead worker exits).
     healthcheck: { disable: true }
-    networks: [internal]
+    # `edge` as well as `internal`: the worker sends email (SMTP to Gmail) and dispatches webhooks, so
+    # it needs outbound internet + DNS. The `internal` network is `internal: true` and has no egress.
+    networks: [internal, edge]
 
   csp-migrate:
     <<: *api
