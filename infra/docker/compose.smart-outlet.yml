@@ -1,0 +1,154 @@
+# smart-outlet.in on the shared 2all host (148.66.152.2). Driven by infra/scripts/remote-deploy.sh.
+#
+# That host's only public entry point is the pay2all stack's edge Caddy (pay2all-caddy-1). This stack
+# publishes NO ports: csp-web / csp-admin / csp-api join the edge network (EDGE_NETWORK, normally
+# pay2all_internal) and Caddy routes smart-outlet.in to them (infra/docker/smart-outlet.caddy).
+# Service names are prefixed on purpose: other stacks on that network already answer to api/web/postgres.
+# Memory limits keep this stack polite on a 4 GB box shared with four other products.
+name: smartcsp
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: '20m', max-file: '5' }
+
+x-hardening: &hardening
+  read_only: true
+  security_opt: ['no-new-privileges:true']
+  cap_drop: ['ALL']
+  tmpfs: ['/tmp']
+  restart: unless-stopped
+  logging: *logging
+
+x-api-env: &api-env
+  PORT: '4610'
+  PUBLIC_API_URL: 'https://${APP_DOMAIN:?}/api'
+  WEB_ORIGINS: 'https://${APP_DOMAIN:?}'
+  STORAGE_DRIVER: fs
+  STORAGE_FS_ROOT: /data/storage
+
+x-api: &api
+  image: '${CSP2ALL_API_IMAGE:?}'
+  <<: *hardening
+  env_file: ['${CSP2ALL_ENV_FILE:-/opt/csp2all/api.env}']
+  environment: *api-env
+  volumes: ['storage:/data/storage']
+  depends_on:
+    csp-postgres: { condition: service_healthy }
+    csp-redis: { condition: service_healthy }
+
+services:
+  csp-api:
+    <<: *api
+    mem_limit: 384m
+    networks: [internal, edge]
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:4610/ready').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  csp-worker:
+    <<: *api
+    mem_limit: 320m
+    command: ['node', 'dist/worker.js']
+    networks: [internal]
+
+  csp-migrate:
+    <<: *api
+    profiles: ['release']
+    restart: 'no'
+    read_only: false
+    mem_limit: 384m
+    command:
+      [
+        'sh',
+        '-c',
+        'DATABASE_URL="$$MIGRATION_DATABASE_URL" ./node_modules/.bin/prisma migrate deploy && node dist/cli/seed-reference.js',
+      ]
+    networks: [internal]
+
+  csp-web:
+    image: '${CSP2ALL_WEB_IMAGE:?}'
+    <<: *hardening
+    mem_limit: 256m
+    environment: { API_URL: 'http://csp-api:4610', PORT: '3000' }
+    networks: [internal, edge]
+
+  csp-admin:
+    image: '${CSP2ALL_ADMIN_IMAGE:?}'
+    <<: *hardening
+    mem_limit: 256m
+    environment: { API_URL: 'http://csp-api:4610', PORT: '3000' }
+    networks: [internal, edge]
+
+  csp-postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    mem_limit: 256m
+    logging: *logging
+    command: ['postgres', '-c', 'shared_buffers=48MB', '-c', 'max_connections=40']
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_superuser_password
+      CSP2ALL_OWNER_PASSWORD_FILE: /run/secrets/pg_owner_password
+      CSP2ALL_APP_PASSWORD_FILE: /run/secrets/pg_app_password
+    secrets: [pg_superuser_password, pg_owner_password, pg_app_password]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init-prod:/docker-entrypoint-initdb.d:ro
+    networks: [internal]
+    healthcheck:
+      # TCP on purpose: during first-boot init the server is socket-only.
+      test: ['CMD', 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres', '-d', 'csp2all']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  csp-redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    mem_limit: 96m
+    logging: *logging
+    command:
+      [
+        'redis-server',
+        '--appendonly',
+        'yes',
+        '--maxmemory',
+        '64mb',
+        '--maxmemory-policy',
+        'noeviction',
+        '--requirepass',
+        '${REDIS_PASSWORD:?}',
+      ]
+    volumes: ['redisdata:/data']
+    networks: [internal]
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli -a "$$REDIS_PASSWORD" --no-auth-warning ping | grep -q PONG']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    environment: { REDIS_PASSWORD: '${REDIS_PASSWORD:?}' }
+
+networks:
+  internal: { internal: true }
+  edge:
+    external: true
+    name: ${EDGE_NETWORK:-pay2all_internal}
+
+volumes:
+  pgdata:
+  redisdata:
+  storage:
+
+secrets:
+  pg_superuser_password: { file: /opt/csp2all/secrets/pg_superuser_password }
+  pg_owner_password: { file: /opt/csp2all/secrets/pg_owner_password }
+  pg_app_password: { file: /opt/csp2all/secrets/pg_app_password }

@@ -1,0 +1,41 @@
+# BEGIN smartcsp (smart-outlet.in)
+# Site block for the shared edge Caddy (pay2all stack) on 148.66.152.2. infra/scripts/remote-deploy.sh
+# re-applies it between the BEGIN/END markers on every smartcsp deploy (a pay2all release may drop it).
+# Containers are reached over the pay2all_internal network, which the smartcsp stack joins.
+#   /api/*  → API (prefix stripped; mobile base URL https://smart-outlet.in/api)
+#   /admin  → admin console (built with ADMIN_BASE_PATH=/admin)     everything else → tenant web app
+smart-outlet.in {
+	encode zstd gzip
+	request_body {
+		max_size 10MB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	handle /api/metrics* {
+		respond 404
+	}
+	handle_path /api/* {
+		reverse_proxy csp-api:4610
+	}
+
+	handle /admin* {
+		reverse_proxy csp-admin:3000
+	}
+
+	handle {
+		reverse_proxy csp-web:3000
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
+
+www.smart-outlet.in {
+	redir https://smart-outlet.in{uri} permanent
+}
+# END smartcsp

@@ -1,7 +1,7 @@
 name: Deploy
 # Started by `npm run deploy` (infra/scripts/deploy.sh) after it pushes main. Runs the full CI,
 # builds and pushes the api/web/admin images to GHCR tagged with the commit SHA, then rolls them out
-# on the production host over SSH (infra/scripts/remote-deploy.sh).
+# on the shared production host over SSH (infra/scripts/remote-deploy.sh, infra/docker/compose.smart-outlet.yml).
 #
 # Repository secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY (private key), DEPLOY_KNOWN_HOSTS.
 on:
@@ -30,10 +30,13 @@ jobs:
       matrix:
         include:
           - { name: api, args: '-f infra/docker/api.Dockerfile' }
-          - { name: web, args: '-f infra/docker/next.Dockerfile --build-arg APP=web' }
+          - {
+              name: web,
+              args: '-f infra/docker/next.Dockerfile --build-arg APP=web --build-arg API_URL=http://csp-api:4610',
+            }
           - {
               name: admin,
-              args: '-f infra/docker/next.Dockerfile --build-arg APP=admin --build-arg ADMIN_BASE_PATH=/admin',
+              args: '-f infra/docker/next.Dockerfile --build-arg APP=admin --build-arg ADMIN_BASE_PATH=/admin --build-arg API_URL=http://csp-api:4610',
             }
     steps:
       - uses: actions/checkout@v7
@@ -67,7 +70,7 @@ jobs:
       - name: Upload stack definition
         run: |
           ssh prod 'mkdir -p /opt/csp2all/docker /opt/csp2all/scripts'
-          scp -r infra/docker/compose.prod.yml infra/docker/Caddyfile infra/docker/postgres-init-prod prod:/opt/csp2all/docker/
+          scp -r infra/docker/compose.smart-outlet.yml infra/docker/smart-outlet.caddy infra/docker/postgres-init-prod prod:/opt/csp2all/docker/
           scp infra/scripts/remote-deploy.sh prod:/opt/csp2all/scripts/
       - name: Roll out ${{ github.sha }}
         # The short-lived GITHUB_TOKEN goes over stdin so the host can pull the private images once.

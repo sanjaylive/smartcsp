@@ -34,22 +34,30 @@ development/test). Reset a local DB: `infra/scripts/reset-db.sh csp2all_dev`.
 
 ## smart-outlet.in (automated deploy)
 
-One hostname, `smart-outlet.in` on `148.66.152.2` (`www.` redirects): tenant web at `/`, admin console at `/admin`
-(built with `ADMIN_BASE_PATH=/admin`), API at `/api` (mobile base URL `https://smart-outlet.in/api`). Stack: `infra/docker/compose.prod.yml` (Postgres, Redis, SeaweedFS S3 and Caddy all on the same host).
+One hostname, `smart-outlet.in` (`www.` redirects): tenant web at `/`, admin console at `/admin` (built with
+`ADMIN_BASE_PATH=/admin`), API at `/api` (mobile base URL `https://smart-outlet.in/api`).
+
+It runs on the **shared 2all host** `148.66.152.2` (user `twoall`) next to pay2all, park2all, ahost and hostelerp.
+That host's only public entry point is the pay2all stack's Caddy (`pay2all-caddy-1`), so this stack
+(`infra/docker/compose.smart-outlet.yml`, compose project `smartcsp`) publishes no ports: `csp-api`, `csp-web` and
+`csp-admin` join the `pay2all_internal` network and every deploy re-applies the `# BEGIN smartcsp … # END smartcsp`
+block (`infra/docker/smart-outlet.caddy`) to that Caddy's Caddyfile — validated first, previous file kept in
+`/opt/csp2all/Caddyfile.edge.bak`, restored if the reload fails. A pay2all release can drop the block; the next
+smartcsp deploy puts it back. Containers have memory limits; uploads/exports use the `fs` driver on the
+`smartcsp_storage` volume.
 
 **Every release:** `npm run deploy` (`infra/scripts/deploy.sh`) — requires a clean `main`; pushes to GitHub, starts
-`.github/workflows/deploy.yml` and follows it: full CI → api/web/admin images pushed to
-`ghcr.io/sanjaylive/smartcsp-*:<sha>` → SSH to the host as `deploy` → `infra/scripts/remote-deploy.sh` (pre-deploy
-`pg_dump` to `/var/backups/csp2all`, `migrate` release job, rolling `up -d`, wait for `/ready`) → HTTPS smoke test.
-Rollback: re-run the Deploy workflow on an older commit, or on the host export the previous `CSP2ALL_*_IMAGE` tags
-and `docker compose … up -d`.
+`.github/workflows/deploy.yml` and follows it: full CI → images `ghcr.io/sanjaylive/smartcsp-{api,web,admin}:<sha>`
+→ SSH → `infra/scripts/remote-deploy.sh` (pre-deploy `pg_dump` to `/opt/csp2all/backups`, `csp-migrate` release job,
+`up --wait` on health checks, edge Caddy block) → HTTPS smoke test. Rollback: re-run the Deploy workflow on an older
+commit.
 
-**One-time host setup** (as root on the server): copy `infra/scripts/server-bootstrap.sh` up and run
-`DEPLOY_PUBKEY='<contents of ~/.ssh/smartcsp_deploy.pub>' sh server-bootstrap.sh` — installs Docker, creates the
-key-only `deploy` user, generates all secrets under `/etc/csp2all` (never in git). Then set `SMTP_*` in
-`/etc/csp2all/api.env` (deploys refuse while `CHANGE_ME` remains) DNS: only the apex (and `www`) A record is needed.
-GitHub secrets `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` hold the connection details.
-After the first deploy, create the first super admin with `bootstrap-admin` (below).
+**Server state** (`/opt/csp2all`, owned by `twoall`): the first deploy generates `api.env` (mode 600) and
+`secrets/` — never in git. Set `SMTP_HOST`/`SMTP_USER`/`SMTP_PASSWORD` in `api.env` for sign-in emails, then
+`npm run deploy` again. GitHub secrets `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` hold the
+connection. After the first deploy, create the first super admin:
+`docker compose -p smartcsp -f /opt/csp2all/docker/compose.smart-outlet.yml run --rm csp-api node dist/cli/bootstrap-admin.js --email …`
+(with the same env exports remote-deploy.sh sets).
 
 ## Production topology
 
