@@ -1,12 +1,12 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useState, type FormEvent } from 'react';
+import { Suspense, useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { Mail, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, BookOpenCheck, Mail, ShieldCheck, WalletMinimal, WifiOff } from 'lucide-react';
 import { otpRequestSchema } from '@csp2all/shared';
-import { PublicShell } from '@/components/toggles';
+import { LanguageToggle, ThemeToggle } from '@/components/toggles';
 import { Alert, Button, Checkbox, Field, Input } from '@/components/ui';
 import { OtpInput } from '@/components/otp-input';
 import { api, isApiError } from '@/lib/api';
@@ -14,6 +14,99 @@ import { routeAfterAuth } from '@/lib/auth';
 import { errorMessage, qk } from '@/lib/hooks';
 import { useI18n } from '@/lib/i18n';
 import type { Me, OtpChallenge } from '@/lib/types';
+
+const BRAND = 'Smart Outlet';
+
+function BrandMark({ onBrand }: { onBrand?: boolean }) {
+  return (
+    <Link href="/" className="inline-flex items-center gap-2.5 font-display">
+      <span
+        aria-hidden
+        className={
+          onBrand
+            ? 'grid size-9 place-items-center rounded-xl bg-on-brand/15 text-on-brand'
+            : 'grid size-9 place-items-center rounded-xl bg-brand text-on-brand shadow-[0_6px_20px_-6px_var(--brand)]'
+        }
+      >
+        <WalletMinimal className="size-5" strokeWidth={2.4} />
+      </span>
+      <span className="text-lg font-extrabold tracking-tight">{BRAND}</span>
+    </Link>
+  );
+}
+
+/* Split layout: branded panel on the left, the auth card on the right. */
+function AuthShell({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
+  const chips = [
+    [WifiOff, t('landing.hero.chip1')],
+    [BookOpenCheck, t('landing.hero.chip2')],
+    [ShieldCheck, t('landing.hero.chip3')],
+  ] as const;
+  return (
+    <div className="grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
+      <a href="#auth" className="skip-link">
+        {t('a11y.skip')}
+      </a>
+      <aside className="relative hidden flex-col justify-between overflow-hidden bg-brand p-12 text-on-brand lg:flex">
+        <div aria-hidden className="aurora aurora-on-brand" />
+        <div aria-hidden className="bg-grid absolute inset-0 opacity-20" />
+        <div className="relative">
+          <BrandMark onBrand />
+        </div>
+        <div className="relative">
+          <h2 className="font-display text-4xl font-extrabold leading-[1.1] tracking-tight">
+            {t('landing.hero.title')} {t('landing.hero.titleEm')}
+          </h2>
+          <p className="mt-4 max-w-md text-on-brand/85">{t('landing.hero.sub')}</p>
+          <ul className="mt-8 flex flex-col gap-3">
+            {chips.map(([Icon, label]) => (
+              <li key={label} className="flex items-center gap-3 font-semibold">
+                <span className="grid size-9 place-items-center rounded-lg bg-on-brand/15">
+                  <Icon className="size-4.5" aria-hidden />
+                </span>
+                {label}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <p className="relative max-w-md text-sm text-on-brand/70">
+          {t('landing.footer.independent')}
+        </p>
+      </aside>
+      <div className="flex min-h-dvh flex-col">
+        <header className="flex items-center justify-between px-5 py-4 lg:justify-end">
+          <span className="lg:hidden">
+            <BrandMark />
+          </span>
+          <div className="flex items-center gap-1.5">
+            <LanguageToggle />
+            <ThemeToggle />
+          </div>
+        </header>
+        <main id="auth" className="flex flex-1 items-center justify-center px-5 py-8 sm:px-8">
+          <div className="w-full max-w-md">{children}</div>
+        </main>
+        <footer className="px-5 py-6">
+          <nav
+            aria-label={t('a11y.legal')}
+            className="flex justify-center gap-5 text-sm text-fg-muted"
+          >
+            <Link className="hover:text-fg" href="/terms">
+              {t('auth.email.terms')}
+            </Link>
+            <Link className="hover:text-fg" href="/privacy">
+              {t('auth.email.privacy')}
+            </Link>
+            <Link className="hover:text-fg" href="/">
+              {t('landing.nav.features')}
+            </Link>
+          </nav>
+        </footer>
+      </div>
+    </div>
+  );
+}
 
 function useCountdown(target: number | null) {
   const [now, setNow] = useState(() => Date.now());
@@ -128,7 +221,7 @@ function LoginInner() {
   const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
   return (
-    <div className="card p-6 sm:p-8">
+    <div className="card p-6 shadow-[0_24px_60px_-28px_rgba(22,26,46,0.35)] sm:p-8">
       {params.get('expired') ? (
         <Alert tone="warning" className="mb-5">
           {t('error.SESSION_EXPIRED')}
@@ -140,7 +233,12 @@ function LoginInner() {
             <span className="flex size-11 items-center justify-center rounded-xl bg-brand-bg text-brand-strong dark:text-fg">
               <Mail aria-hidden className="size-5" />
             </span>
-            <h1 className="text-2xl font-extrabold tracking-tight">{t('auth.email.title')}</h1>
+            <div>
+              <h1 className="font-display text-2xl font-extrabold tracking-tight">
+                {t('auth.email.title')}
+              </h1>
+              <p className="text-sm text-fg-muted">{t('login.subtitle')}</p>
+            </div>
           </div>
           <Field
             label={t('auth.email.label')}
@@ -211,7 +309,9 @@ function LoginInner() {
             <span className="flex size-11 items-center justify-center rounded-xl bg-brand-bg text-brand-strong dark:text-fg">
               <ShieldCheck aria-hidden className="size-5" />
             </span>
-            <h1 className="text-2xl font-extrabold tracking-tight">{t('auth.otp.title')}</h1>
+            <h1 className="font-display text-2xl font-extrabold tracking-tight">
+              {t('auth.otp.title')}
+            </h1>
           </div>
           {notice ? <Alert tone="success">{notice}</Alert> : null}
           <div className="flex flex-col gap-2">
@@ -253,6 +353,7 @@ function LoginInner() {
             </Button>
             <Button
               variant="ghost"
+              icon={<ArrowLeft aria-hidden className="size-4" />}
               onClick={() => {
                 setStep('email');
                 setError(null);
@@ -271,10 +372,10 @@ function LoginInner() {
 
 export default function LoginPage() {
   return (
-    <PublicShell>
+    <AuthShell>
       <Suspense>
         <LoginInner />
       </Suspense>
-    </PublicShell>
+    </AuthShell>
   );
 }

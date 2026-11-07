@@ -489,4 +489,5 @@ export const hi: Record<TranslationKey, string> = {
   'landing.footer.rights': 'सर्वाधिकार सुरक्षित।',
   'landing.footer.independent':
     'स्मार्ट आउटलेट एक स्वतंत्र रिकॉर्ड-कीपिंग टूल है, जो किसी बैंक, भुगतान नेटवर्क या सरकारी संस्था से जुड़ा नहीं है।',
+  'login.subtitle': 'ईमेल पर आए एक-बार के कोड से साइन इन करें या अपनी दुकान बनाएँ।',
 };

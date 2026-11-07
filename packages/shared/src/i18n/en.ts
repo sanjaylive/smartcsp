@@ -502,6 +502,7 @@ export const en = {
   'landing.footer.rights': 'All rights reserved.',
   'landing.footer.independent':
     'Smart Outlet is an independent record-keeping tool, not affiliated with any bank, payment network or government body.',
+  'login.subtitle': 'Sign in or create your shop with a one-time email code.',
 } as const;
 
 export type TranslationKey = keyof typeof en;
