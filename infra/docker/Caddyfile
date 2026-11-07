@@ -4,6 +4,9 @@
 	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
 	reverse_proxy web:3000
 }
+www.{$APP_DOMAIN} {
+	redir https://{$APP_DOMAIN}{uri} permanent
+}
 {$ADMIN_DOMAIN} {
 	encode zstd gzip
 	header Strict-Transport-Security "max-age=31536000; includeSubDomains"

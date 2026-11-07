@@ -24,14 +24,14 @@ services:
     env_file: ['${CSP2ALL_ENV_FILE:-/etc/csp2all/api.env}']
     environment: { PORT: '4610' }
     networks: [internal, edge]
-    depends_on: [postgres, redis]
+    depends_on: [postgres, redis, s3]
   worker:
     image: '${CSP2ALL_API_IMAGE:-csp2all-api:latest}'
     <<: *hardening
     command: ['node', 'dist/worker.js']
     env_file: ['${CSP2ALL_ENV_FILE:-/etc/csp2all/api.env}']
     networks: [internal]
-    depends_on: [postgres, redis]
+    depends_on: [postgres, redis, s3]
   migrate:
     image: '${CSP2ALL_API_IMAGE:-csp2all-api:latest}'
     profiles: ['release']
@@ -79,6 +79,16 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./postgres-init-prod:/docker-entrypoint-initdb.d:ro
     networks: [internal]
+  # Private S3-compatible object storage (attachments, exports). Internal network only; the API
+  # creates the bucket on first use. Credentials live in /etc/csp2all/seaweedfs-s3.json.
+  s3:
+    image: chrislusf/seaweedfs:3.97
+    restart: unless-stopped
+    command: ['server', '-s3', '-dir=/data', '-s3.config=/etc/seaweedfs/s3.json']
+    volumes:
+      - s3data:/data
+      - /etc/csp2all/seaweedfs-s3.json:/etc/seaweedfs/s3.json:ro
+    networks: [internal]
   redis:
     image: redis:7.4-alpine
     restart: unless-stopped
@@ -93,6 +103,7 @@ networks:
 volumes:
   pgdata:
   redisdata:
+  s3data:
   caddy_data:
 
 secrets:

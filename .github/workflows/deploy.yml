@@ -1,0 +1,85 @@
+name: Deploy
+# Started by `npm run deploy` (infra/scripts/deploy.sh) after it pushes main. Runs the full CI,
+# builds and pushes the api/web/admin images to GHCR tagged with the commit SHA, then rolls them out
+# on the production host over SSH (infra/scripts/remote-deploy.sh).
+#
+# Repository secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY (private key), DEPLOY_KNOWN_HOSTS.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/smartcsp
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  images:
+    needs: ci
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        include:
+          - { name: api, args: '-f infra/docker/api.Dockerfile' }
+          - { name: web, args: '-f infra/docker/next.Dockerfile --build-arg APP=web' }
+          - { name: admin, args: '-f infra/docker/next.Dockerfile --build-arg APP=admin' }
+    steps:
+      - uses: actions/checkout@v7
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Build and push ${{ matrix.name }}
+        run: |
+          IMAGE="$IMAGE_PREFIX-${{ matrix.name }}:${{ github.sha }}"
+          docker build ${{ matrix.args }} -t "$IMAGE" .
+          docker push "$IMAGE"
+
+  deploy:
+    needs: images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://smart-outlet.in
+    steps:
+      - uses: actions/checkout@v7
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host prod\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/deploy_key\n  StrictHostKeyChecking yes\n' \
+            "${{ secrets.DEPLOY_HOST }}" "${{ secrets.DEPLOY_USER }}" > ~/.ssh/config
+      - name: Upload stack definition
+        run: |
+          ssh prod 'mkdir -p /opt/csp2all/docker /opt/csp2all/scripts'
+          scp -r infra/docker/compose.prod.yml infra/docker/Caddyfile infra/docker/postgres-init-prod prod:/opt/csp2all/docker/
+          scp infra/scripts/remote-deploy.sh prod:/opt/csp2all/scripts/
+      - name: Roll out ${{ github.sha }}
+        # The short-lived GITHUB_TOKEN goes over stdin so the host can pull the private images once.
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | ssh prod \
+            "IMAGE_PREFIX='$IMAGE_PREFIX' TAG='${{ github.sha }}' GHCR_USER='${{ github.actor }}' sh /opt/csp2all/scripts/remote-deploy.sh"
+      - name: Smoke test
+        run: |
+          for u in https://api.smart-outlet.in/ready https://smart-outlet.in/login https://admin.smart-outlet.in/; do
+            ok=
+            for _ in $(seq 1 20); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' -m 10 "$u" || true)
+              if [ "$code" = 200 ]; then ok=1; break; fi
+              sleep 6
+            done
+            [ -n "$ok" ] || { echo "::error::$u answered $code"; exit 1; }
+            echo "$u → 200"
+          done
