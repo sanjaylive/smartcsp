@@ -152,12 +152,30 @@ model Tenant {
   updatedAt            DateTime @updatedAt
   version              Int      @default(0)
 
-  branches     Branch[]
-  memberships  Membership[]
-  services     TenantService[]
-  subscription Subscription?
+  branches      Branch[]
+  memberships   Membership[]
+  services      TenantService[]
+  subscription  Subscription?
+  customDomains CustomDomain[]
 
   @@map("tenants")
+}
+
+model CustomDomain {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  tenantId          String    @db.Uuid
+  domain            String    @unique
+  status            String    @default("PENDING") // PENDING | VERIFIED | FAILED
+  verificationToken String
+  verifiedAt        DateTime?
+  lastCheckedAt     DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("custom_domains")
 }
 
 model Branch {

@@ -116,6 +116,17 @@ awk '/^# BEGIN smartcsp/{skip=1}
      !skip { if ($0 == "") blank++; else { for (; blank > 0; blank--) print ""; print } }
      /^# END smartcsp/{skip=0}' "$CADDYFILE" > "$CANDIDATE"
 printf '\n' >> "$CANDIDATE" && cat "$BLOCK" >> "$CANDIDATE"
+# Ensure the global on_demand_tls ask (for shop custom domains) exists in the first global block.
+# Caddy only issues on-demand certs this ask approves, so the custom-domain catch-all is self-securing.
+if ! grep -q 'on_demand_tls' "$CANDIDATE"; then
+  TMP2=$(mktemp)
+  awk 'BEGIN{done=0}
+       {a[NR]=$0}
+       END{for(i=1;i<=NR;i++){print a[i];
+         if(!done && a[i] ~ /^[[:space:]]*\{[[:space:]]*$/){
+           print "\ton_demand_tls {"; print "\t\task http://csp-api:4610/v1/public/tls-check"; print "\t}"; done=1}}}' \
+    "$CANDIDATE" > "$TMP2" && mv "$TMP2" "$CANDIDATE"
+fi
 if cmp -s "$CANDIDATE" "$CADDYFILE"; then
   log "Edge Caddyfile already up to date"
 elif docker exec -i "$EDGE_CONTAINER" sh -c 'cat > /tmp/smartcsp.Caddyfile && caddy validate --config /tmp/smartcsp.Caddyfile --adapter caddyfile' < "$CANDIDATE" >/dev/null 2>&1; then

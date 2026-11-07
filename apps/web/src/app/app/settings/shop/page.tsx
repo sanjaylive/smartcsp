@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Lock, Palette, Store } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Check, Copy, Globe, Lock, Palette, Store, Trash2 } from 'lucide-react';
 import { shopProfileUpdateSchema } from '@csp2all/shared';
 import { api, isApiError } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
-import { qk, useFormErrors, usePermissions, zodToFieldErrors } from '@/lib/hooks';
+import { errorMessage, qk, useFormErrors, usePermissions, zodToFieldErrors } from '@/lib/hooks';
 import { INDIAN_STATES } from '@/lib/constants';
 import type { TenantProfile } from '@/lib/types';
 import {
@@ -45,7 +45,173 @@ export default function ShopProfilePage() {
       <QueryState query={q}>
         {(p) => <ProfileForm key={p.version} p={p} reload={() => q.refetch()} />}
       </QueryState>
+      <div className="mt-6">
+        <DomainsSection />
+      </div>
     </>
+  );
+}
+
+interface DomainView {
+  id: string;
+  domain: string;
+  status: string;
+  verifiedAt: string | null;
+  dns: { txt: { name: string; value: string }; a: { name: string; value: string } };
+}
+
+function CopyField({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div>
+      <p className="text-xs font-semibold text-fg-muted">{label}</p>
+      <div className="mt-1 flex items-center gap-2">
+        <code className="flex-1 overflow-x-auto rounded-lg border border-border bg-bg px-2 py-1.5 font-mono text-[12px]">
+          {value}
+        </code>
+        <button
+          type="button"
+          aria-label="Copy"
+          className="shrink-0 rounded-lg border border-border p-1.5 hover:bg-surface-muted"
+          onClick={() => {
+            void navigator.clipboard?.writeText(value);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          }}
+        >
+          {copied ? (
+            <Check className="size-4 text-success" />
+          ) : (
+            <Copy className="size-4 text-fg-muted" />
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DomainsSection() {
+  const { t } = useI18n();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [domain, setDomain] = useState('');
+  const q = useQuery({
+    queryKey: ['domains'],
+    queryFn: () => api<DomainView[]>('/v1/tenant/domains'),
+  });
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['domains'] });
+  const add = useMutation({
+    mutationFn: () => api('/v1/tenant/domains', { method: 'POST', body: { domain } }),
+    onSuccess: () => {
+      setDomain('');
+      invalidate();
+    },
+    onError: (e) => toast('error', errorMessage(t, e)),
+  });
+  const verify = useMutation({
+    mutationFn: (id: string) => api(`/v1/tenant/domains/${id}/verify`, { method: 'POST' }),
+    onSuccess: () => {
+      toast('success', t('domains.verified'));
+      invalidate();
+    },
+    onError: (e) => toast('error', errorMessage(t, e)),
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => api(`/v1/tenant/domains/${id}`, { method: 'DELETE' }),
+    onSuccess: invalidate,
+    onError: (e) => toast('error', errorMessage(t, e)),
+  });
+
+  return (
+    <Card>
+      <CardHeader
+        title={
+          <span className="inline-flex items-center gap-2">
+            <Globe aria-hidden className="size-5 text-brand" />
+            {t('domains.title')}
+          </span>
+        }
+        description={t('domains.help')}
+      />
+      <form
+        className="flex flex-col gap-2 sm:flex-row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (domain.trim()) add.mutate();
+        }}
+      >
+        <Input
+          value={domain}
+          placeholder="shop.example.com"
+          inputMode="url"
+          autoComplete="off"
+          onChange={(e) => setDomain(e.target.value)}
+          aria-label={t('domains.add')}
+        />
+        <Button type="submit" loading={add.isPending} disabled={!domain.trim()}>
+          {t('domains.add')}
+        </Button>
+      </form>
+      <QueryState query={q}>
+        {(list) =>
+          list.length === 0 ? (
+            <p className="mt-4 text-sm text-fg-muted">{t('domains.empty')}</p>
+          ) : (
+            <ul className="mt-4 flex flex-col gap-3">
+              {list.map((d) => (
+                <li key={d.id} className="rounded-xl border border-border p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-semibold">{d.domain}</span>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        tone={
+                          d.status === 'VERIFIED'
+                            ? 'success'
+                            : d.status === 'FAILED'
+                              ? 'danger'
+                              : 'warning'
+                        }
+                      >
+                        {t(
+                          d.status === 'VERIFIED'
+                            ? 'domains.live'
+                            : d.status === 'FAILED'
+                              ? 'domains.failed'
+                              : 'domains.pending',
+                        )}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        aria-label={t('common.remove')}
+                        icon={<Trash2 aria-hidden className="size-4" />}
+                        onClick={() => remove.mutate(d.id)}
+                      />
+                    </div>
+                  </div>
+                  {d.status !== 'VERIFIED' && (
+                    <div className="mt-3 flex flex-col gap-3">
+                      <p className="text-[13px] text-fg-muted">{t('domains.dnsHelp')}</p>
+                      <CopyField label={`TXT · ${d.dns.txt.name}`} value={d.dns.txt.value} />
+                      <CopyField label={`A · ${d.dns.a.name}`} value={d.dns.a.value} />
+                      <div>
+                        <Button
+                          size="sm"
+                          loading={verify.isPending && verify.variables === d.id}
+                          onClick={() => verify.mutate(d.id)}
+                        >
+                          {t('domains.verify')}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )
+        }
+      </QueryState>
+    </Card>
   );
 }
 

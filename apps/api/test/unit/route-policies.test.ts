@@ -41,10 +41,12 @@ describe('route access policies', () => {
         'AuthController.requestPhoneOtp',
         'AuthController.verifyOtp',
         'AuthController.verifyPhoneOtp',
+        'HealthController.domainResolve',
         'HealthController.health',
         'HealthController.metrics',
         'HealthController.publicConfig',
         'HealthController.ready',
+        'HealthController.tlsCheck',
         'IntegrationsController.webhook',
       ].sort(),
     );

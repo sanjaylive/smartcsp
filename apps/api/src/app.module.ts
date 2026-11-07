@@ -34,6 +34,8 @@ import { AttachmentsController } from './modules/attachments/attachments.control
 import { ExportsController } from './modules/exports/exports.controller';
 import { IntegrationsService } from './modules/integrations/integrations.service';
 import { Sms21Service } from './modules/messaging/sms21.service';
+import { DomainsController } from './modules/domains/domains.controller';
+import { DomainsService } from './modules/domains/domains.service';
 import { IntegrationsController } from './modules/integrations/integrations.controller';
 import { AdminAuthController } from './modules/admin/admin-auth.controller';
 import { AdminController } from './modules/admin/admin.controller';
@@ -59,6 +61,7 @@ export const CONTROLLERS = [
   IntegrationsController,
   AdminAuthController,
   AdminController,
+  DomainsController,
   SupportController,
 ];
 
@@ -84,6 +87,7 @@ export const CONTROLLERS = [
     StorageService,
     IntegrationsService,
     Sms21Service,
+    DomainsService,
     { provide: APP_GUARD, useClass: SecurityGuard },
   ],
 })

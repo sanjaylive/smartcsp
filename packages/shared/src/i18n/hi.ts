@@ -502,4 +502,16 @@ export const hi: Record<TranslationKey, string> = {
   'auth.phone.invalid': 'मान्य 10-अंकों का मोबाइल नंबर दर्ज करें।',
   'auth.phone.sent': 'हमने आपके फ़ोन पर कोड भेज दिया है।',
   'auth.phone.change': 'नंबर बदलें',
+  'domains.title': 'कस्टम डोमेन',
+  'domains.help': 'अपनी दुकान को अपने वेब पते पर खोलें, जैसे shop.yourbusiness.com।',
+  'domains.add': 'डोमेन जोड़ें',
+  'domains.empty': 'अभी कोई कस्टम डोमेन नहीं।',
+  'domains.dnsHelp':
+    'ये DNS रिकॉर्ड अपने डोमेन प्रोवाइडर पर जोड़ें, फिर सत्यापित करें। HTTPS अपने-आप सेट हो जाता है।',
+  'domains.verify': 'सत्यापित करें',
+  'domains.verified': 'डोमेन सत्यापित। HTTPS जल्द ही तैयार होगा।',
+  'domains.live': 'लाइव',
+  'domains.pending': 'DNS लंबित',
+  'domains.failed': 'अभी नहीं मिला',
+  'common.remove': 'हटाएँ',
 };

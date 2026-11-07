@@ -5,6 +5,7 @@ import { BRAND_DEFAULTS } from '../admin/admin.controller';
 import { Db } from '../../common/db';
 import { RedisService } from '../../common/redis';
 import { Sms21Service } from '../messaging/sms21.service';
+import { DomainsService } from '../domains/domains.service';
 import { AppError } from '../../common/errors';
 import { ApiDoc } from '../../common/http';
 
@@ -33,6 +34,7 @@ export class HealthController {
     private readonly db: Db,
     private readonly redis: RedisService,
     private readonly sms21: Sms21Service,
+    private readonly domains: DomainsService,
   ) {}
 
   @Get('health')
@@ -100,6 +102,26 @@ export class HealthController {
         phoneSignIn: sms.configured && sms.otpEnabled,
       };
     });
+  }
+
+  /** Caddy on-demand TLS ask endpoint: 200 only for verified custom domains, 404 otherwise. */
+  @Get('v1/public/tls-check')
+  @Public()
+  @ApiDoc({ summary: 'On-demand TLS allow-check for a custom domain', tags: ['Operations'] })
+  async tlsCheck(@Req() req: Request, @Res() res: Response) {
+    const domain = String(req.query.domain ?? '').toLowerCase();
+    const hit = domain ? await this.domains.resolveVerified(domain) : null;
+    res.status(hit ? 200 : 404).send(hit ? 'ok' : 'unknown domain');
+  }
+
+  /** Public: resolve a custom-domain host to its shop (id + branding) for host scoping. */
+  @Get('v1/public/domain')
+  @Public()
+  @ApiDoc({ summary: 'Resolve a custom domain to its shop', tags: ['Operations'] })
+  async domainResolve(@Req() req: Request) {
+    const domain = String(req.query.domain ?? '').toLowerCase();
+    const hit = domain ? await this.domains.resolveVerified(domain) : null;
+    return { shop: hit };
   }
 
   /** Protect with METRICS_TOKEN and/or expose only on the internal network. */

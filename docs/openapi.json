@@ -137,6 +137,90 @@
         "security": []
       }
     },
+    "/v1/public/tls-check": {
+      "get": {
+        "summary": "On-demand TLS allow-check for a custom domain",
+        "tags": [
+          "Operations"
+        ],
+        "operationId": "Health_tlsCheck",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/public/domain": {
+      "get": {
+        "summary": "Resolve a custom domain to its shop",
+        "tags": [
+          "Operations"
+        ],
+        "operationId": "Health_domainResolve",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
     "/metrics": {
       "get": {
         "summary": "Prometheus metrics (Bearer METRICS_TOKEN when configured; block at the public proxy)",
@@ -10924,6 +11008,232 @@
         ],
         "x-platform-permissions": [
           "admins.manage"
+        ]
+      }
+    },
+    "/v1/tenant/domains": {
+      "get": {
+        "summary": "List the shop’s custom domains",
+        "tags": [
+          "Domains"
+        ],
+        "operationId": "Domains_list",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "settings.manage"
+        ]
+      },
+      "post": {
+        "summary": "Add a custom domain (returns the DNS records to set)",
+        "tags": [
+          "Domains"
+        ],
+        "operationId": "Domains_add",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "settings.manage"
+        ]
+      }
+    },
+    "/v1/tenant/domains/{id}/verify": {
+      "post": {
+        "summary": "Check the verification TXT record and activate the domain",
+        "tags": [
+          "Domains"
+        ],
+        "operationId": "Domains_verify",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "settings.manage"
+        ]
+      }
+    },
+    "/v1/tenant/domains/{id}": {
+      "delete": {
+        "summary": "Remove a custom domain",
+        "tags": [
+          "Domains"
+        ],
+        "operationId": "Domains_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "settings.manage"
         ]
       }
     },

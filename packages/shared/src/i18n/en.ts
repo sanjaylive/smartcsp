@@ -515,6 +515,18 @@ export const en = {
   'auth.phone.invalid': 'Enter a valid 10-digit mobile number.',
   'auth.phone.sent': 'We’ve sent a code to your phone.',
   'auth.phone.change': 'Change number',
+  'domains.title': 'Custom domains',
+  'domains.help': 'Open your shop on your own web address, like shop.yourbusiness.com.',
+  'domains.add': 'Add domain',
+  'domains.empty': 'No custom domains yet.',
+  'domains.dnsHelp':
+    'Add these DNS records at your domain provider, then verify. HTTPS is set up automatically.',
+  'domains.verify': 'Verify',
+  'domains.verified': 'Domain verified. HTTPS will be ready shortly.',
+  'domains.live': 'Live',
+  'domains.pending': 'Pending DNS',
+  'domains.failed': 'Not found yet',
+  'common.remove': 'Remove',
 } as const;
 
 export type TranslationKey = keyof typeof en;
