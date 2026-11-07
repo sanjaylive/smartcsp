@@ -58,6 +58,8 @@ services:
     <<: *api
     mem_limit: 320m
     command: ['node', 'dist/worker.js']
+    # The image HEALTHCHECK probes the API's HTTP port; the worker serves none (a dead worker exits).
+    healthcheck: { disable: true }
     networks: [internal]
 
   csp-migrate:

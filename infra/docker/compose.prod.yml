@@ -33,6 +33,8 @@ services:
     image: '${CSP2ALL_API_IMAGE:-csp2all-api:latest}'
     <<: *hardening
     command: ['node', 'dist/worker.js']
+    # The image HEALTHCHECK probes the API's HTTP port; the worker serves none (a dead worker exits).
+    healthcheck: { disable: true }
     env_file: ['${CSP2ALL_ENV_FILE:-/etc/csp2all/api.env}']
     environment: *public-urls
     networks: [internal]
