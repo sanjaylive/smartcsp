@@ -22,7 +22,11 @@ services:
     image: '${CSP2ALL_API_IMAGE:-csp2all-api:latest}'
     <<: *hardening
     env_file: ['${CSP2ALL_ENV_FILE:-/etc/csp2all/api.env}']
-    environment: { PORT: '4610' }
+    # One public hostname: the API lives at /api and both web apps share the origin.
+    environment: &public-urls
+      PORT: '4610'
+      PUBLIC_API_URL: 'https://${APP_DOMAIN}/api'
+      WEB_ORIGINS: 'https://${APP_DOMAIN}'
     networks: [internal, edge]
     depends_on: [postgres, redis, s3]
   worker:
@@ -30,6 +34,7 @@ services:
     <<: *hardening
     command: ['node', 'dist/worker.js']
     env_file: ['${CSP2ALL_ENV_FILE:-/etc/csp2all/api.env}']
+    environment: *public-urls
     networks: [internal]
     depends_on: [postgres, redis, s3]
   migrate:
@@ -63,8 +68,6 @@ services:
       - caddy_data:/data
     environment:
       APP_DOMAIN: ${APP_DOMAIN}
-      ADMIN_DOMAIN: ${ADMIN_DOMAIN}
-      API_DOMAIN: ${API_DOMAIN}
     networks: [edge]
   postgres:
     image: postgres:17-alpine

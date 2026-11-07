@@ -2,6 +2,8 @@ import path from 'node:path';
 import type { NextConfig } from 'next';
 
 const API_URL = (process.env.API_URL ?? 'http://localhost:4610').replace(/\/$/, '');
+/** Build-time mount point, e.g. '/admin' when served under the tenant domain. Empty in dev/tests. */
+const BASE_PATH = (process.env.ADMIN_BASE_PATH ?? '').replace(/\/$/, '');
 
 /**
  * Static security headers. The Content-Security-Policy (with a per-request script nonce) is set
@@ -29,6 +31,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: [],
+  ...(BASE_PATH ? { basePath: BASE_PATH } : {}),
+  env: { NEXT_PUBLIC_BASE_PATH: BASE_PATH },
   async rewrites() {
     // Same-origin proxy: the admin session cookie (httpOnly, SameSite=Strict) stays first-party.
     return [{ source: '/api/:path*', destination: `${API_URL}/:path*` }];

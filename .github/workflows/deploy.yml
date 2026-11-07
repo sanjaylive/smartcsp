@@ -31,7 +31,10 @@ jobs:
         include:
           - { name: api, args: '-f infra/docker/api.Dockerfile' }
           - { name: web, args: '-f infra/docker/next.Dockerfile --build-arg APP=web' }
-          - { name: admin, args: '-f infra/docker/next.Dockerfile --build-arg APP=admin' }
+          - {
+              name: admin,
+              args: '-f infra/docker/next.Dockerfile --build-arg APP=admin --build-arg ADMIN_BASE_PATH=/admin',
+            }
     steps:
       - uses: actions/checkout@v7
       - name: Log in to GHCR
@@ -73,7 +76,7 @@ jobs:
             "IMAGE_PREFIX='$IMAGE_PREFIX' TAG='${{ github.sha }}' GHCR_USER='${{ github.actor }}' sh /opt/csp2all/scripts/remote-deploy.sh"
       - name: Smoke test
         run: |
-          for u in https://api.smart-outlet.in/ready https://smart-outlet.in/login https://admin.smart-outlet.in/; do
+          for u in https://smart-outlet.in/api/ready https://smart-outlet.in/login https://smart-outlet.in/admin/login; do
             ok=
             for _ in $(seq 1 20); do
               code=$(curl -s -o /dev/null -w '%{http_code}' -m 10 "$u" || true)

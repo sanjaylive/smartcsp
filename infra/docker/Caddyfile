@@ -1,24 +1,28 @@
-# Automatic HTTPS for the three public hostnames. HSTS + basic hardening headers.
+# One public hostname: /api → API, /admin → admin console, everything else → tenant web app.
+# Automatic HTTPS, HSTS; www redirects to the apex.
 {$APP_DOMAIN} {
 	encode zstd gzip
 	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
-	reverse_proxy web:3000
+
+	# The API is mounted at /api (same path the web apps already proxy), so browsers and the mobile
+	# app share one origin and Caddy is the only proxy hop (TRUST_PROXY=true).
+	handle_path /api/* {
+		@internal path /metrics /metrics/*
+		respond @internal 404
+		reverse_proxy api:4610
+	}
+
+	# Admin console (built with ADMIN_BASE_PATH=/admin). Optionally restrict to office/VPN IPs:
+	#   @blocked not remote_ip 203.0.113.0/24
+	#   respond @blocked 403
+	handle /admin* {
+		reverse_proxy admin:3000
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
 }
 www.{$APP_DOMAIN} {
 	redir https://{$APP_DOMAIN}{uri} permanent
-}
-{$ADMIN_DOMAIN} {
-	encode zstd gzip
-	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
-	# Optionally restrict the admin console to office/VPN IPs:
-	# @blocked not remote_ip 203.0.113.0/24
-	# respond @blocked 403
-	reverse_proxy admin:3000
-}
-{$API_DOMAIN} {
-	encode zstd gzip
-	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
-	@internal path /metrics
-	respond @internal 404
-	reverse_proxy api:4610
 }

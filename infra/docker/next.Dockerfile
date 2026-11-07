@@ -6,6 +6,9 @@ ARG APP=web
 # Next.js bakes rewrites in at build time: the /api proxy target must be provided here.
 ARG API_URL=http://api:4610
 ENV API_URL=${API_URL}
+# Admin only: serve under a path (e.g. /admin) instead of its own hostname. Baked in at build time.
+ARG ADMIN_BASE_PATH=
+ENV ADMIN_BASE_PATH=${ADMIN_BASE_PATH}
 RUN corepack enable
 WORKDIR /repo
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json ./

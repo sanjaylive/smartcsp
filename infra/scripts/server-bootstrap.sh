@@ -10,8 +10,6 @@
 set -eu
 : "${DEPLOY_PUBKEY:?set DEPLOY_PUBKEY to the deploy public key}"
 APP_DOMAIN="${APP_DOMAIN:-smart-outlet.in}"
-ADMIN_DOMAIN="${ADMIN_DOMAIN:-admin.$APP_DOMAIN}"
-API_DOMAIN="${API_DOMAIN:-api.$APP_DOMAIN}"
 [ "$(id -u)" = 0 ] || { echo "run as root" >&2; exit 1; }
 
 # --- Ports 80/443 must be free for the stack's Caddy container --------------------------------
@@ -24,7 +22,7 @@ if [ -n "$busy" ]; then
   else
     echo "Ports 80/443 are in use by a host service:" >&2
     echo "$busy" >&2
-    echo "The stack runs its own Caddy (TLS for $APP_DOMAIN, $ADMIN_DOMAIN, $API_DOMAIN)." >&2
+    echo "The stack runs its own Caddy (TLS for $APP_DOMAIN; /admin and /api are paths on it)." >&2
     echo "Re-run with REPLACE_EXISTING_PROXY=1 to stop/disable it, or free the ports yourself." >&2
     exit 1
   fi
@@ -74,8 +72,6 @@ write_once() { # path, then content on stdin
 
 write_once /etc/csp2all/prod.env <<EOF
 APP_DOMAIN=$APP_DOMAIN
-ADMIN_DOMAIN=$ADMIN_DOMAIN
-API_DOMAIN=$API_DOMAIN
 REDIS_PASSWORD=$REDIS_PW
 EOF
 
@@ -92,8 +88,8 @@ LOG_LEVEL=info
 DATABASE_URL=postgresql://csp2all_app:$PG_APP@postgres:5432/csp2all
 MIGRATION_DATABASE_URL=postgresql://csp2all_owner:$PG_OWNER@postgres:5432/csp2all
 REDIS_URL=redis://:$REDIS_PW@redis:6379/0
-WEB_ORIGINS=https://$APP_DOMAIN,https://$ADMIN_DOMAIN
-PUBLIC_API_URL=https://$API_DOMAIN
+WEB_ORIGINS=https://$APP_DOMAIN
+PUBLIC_API_URL=https://$APP_DOMAIN/api
 COOKIE_SECURE=true
 TRUST_PROXY=true
 OTP_PEPPER=$OTP_PEPPER
@@ -125,5 +121,5 @@ EOF
 echo
 echo "Done. Next:"
 echo "  1. Edit /etc/csp2all/api.env and set SMTP_HOST / SMTP_USER / SMTP_PASSWORD (and SMTP_PORT/SECURE)."
-echo "  2. DNS A records for $APP_DOMAIN, $ADMIN_DOMAIN, $API_DOMAIN → this server."
+echo "  2. DNS A record for $APP_DOMAIN (and www) → this server."
 echo "  3. From your laptop: npm run deploy"

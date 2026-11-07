@@ -34,8 +34,8 @@ development/test). Reset a local DB: `infra/scripts/reset-db.sh csp2all_dev`.
 
 ## smart-outlet.in (automated deploy)
 
-Hosts: `smart-outlet.in` (web, `www.` redirects), `admin.smart-outlet.in`, `api.smart-outlet.in` on `148.66.152.2`,
-running `infra/docker/compose.prod.yml` (Postgres, Redis, SeaweedFS S3 and Caddy all on the same host).
+One hostname, `smart-outlet.in` on `148.66.152.2` (`www.` redirects): tenant web at `/`, admin console at `/admin`
+(built with `ADMIN_BASE_PATH=/admin`), API at `/api` (mobile base URL `https://smart-outlet.in/api`). Stack: `infra/docker/compose.prod.yml` (Postgres, Redis, SeaweedFS S3 and Caddy all on the same host).
 
 **Every release:** `npm run deploy` (`infra/scripts/deploy.sh`) — requires a clean `main`; pushes to GitHub, starts
 `.github/workflows/deploy.yml` and follows it: full CI → api/web/admin images pushed to
@@ -47,7 +47,7 @@ and `docker compose … up -d`.
 **One-time host setup** (as root on the server): copy `infra/scripts/server-bootstrap.sh` up and run
 `DEPLOY_PUBKEY='<contents of ~/.ssh/smartcsp_deploy.pub>' sh server-bootstrap.sh` — installs Docker, creates the
 key-only `deploy` user, generates all secrets under `/etc/csp2all` (never in git). Then set `SMTP_*` in
-`/etc/csp2all/api.env` (deploys refuse while `CHANGE_ME` remains) and add DNS A records for `admin.` and `api.`.
+`/etc/csp2all/api.env` (deploys refuse while `CHANGE_ME` remains) DNS: only the apex (and `www`) A record is needed.
 GitHub secrets `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` hold the connection details.
 After the first deploy, create the first super admin with `bootstrap-admin` (below).
 

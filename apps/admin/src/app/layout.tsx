@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: { default: 'CSP2All Admin', template: '%s · CSP2All Admin' },
   description: 'CSP2All platform administration console',
   robots: { index: false, follow: false },
-  icons: { icon: '/icon.svg' },
+  icons: { icon: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/icon.svg` },
 };
 
 export const viewport: Viewport = {

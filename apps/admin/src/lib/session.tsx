@@ -40,7 +40,11 @@ function AuthRedirects() {
   useEffect(
     () =>
       onAuthError((e) => {
-        if (typeof window !== 'undefined' && window.location.pathname.startsWith('/login')) return;
+        if (
+          typeof window !== 'undefined' &&
+          window.location.pathname.startsWith(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/login`)
+        )
+          return;
         qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' });
         void qc.invalidateQueries({ queryKey: ['me'] });
         const reason =
