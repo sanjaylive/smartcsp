@@ -3,9 +3,12 @@ import type { Response } from 'express';
 import {
   otpRequestSchema,
   otpVerifySchema,
+  phoneRequestSchema,
+  phoneVerifySchema,
   refreshSchema,
   selectTenantSchema,
 } from '@csp2all/shared';
+import type { ErrorCode } from '@csp2all/shared';
 import { Auth, Public, UserAuth, type AppRequest, type AuthState } from '../../common/access';
 import { ApiDoc, parse } from '../../common/http';
 import { Db } from '../../common/db';
@@ -16,6 +19,8 @@ import { AuditService } from '../../common/audit';
 import { OtpService } from './otp.service';
 import { SessionService } from './session.service';
 import { MeService } from './me.service';
+import { Sms21Service } from '../messaging/sms21.service';
+import type { User } from '@prisma/client';
 
 @Controller('v1/auth')
 export class AuthController {
@@ -25,6 +30,7 @@ export class AuthController {
     private readonly db: Db,
     private readonly audit: AuditService,
     private readonly meService: MeService,
+    private readonly sms21: Sms21Service,
   ) {}
 
   @Post('otp/request')
@@ -60,11 +66,90 @@ export class AuthController {
     const dto = parse(otpVerifySchema, body);
     const ipHash = hashIp(clientIp(req));
     const email = await this.otp.verify(dto.challengeId, dto.email, 'LOGIN', dto.code, ipHash);
-
     const user = await this.db.user.upsert({ where: { email }, create: { email }, update: {} });
-    if (user.status !== 'ACTIVE') throw new AppError('UNAUTHENTICATED', 'This account is disabled');
+    return this.completeLogin(user, dto.client, dto.deviceName, req, res);
+  }
 
-    // Pre-select the only shop, if the user has exactly one active membership.
+  @Post('phone/request')
+  @HttpCode(202)
+  @Public()
+  @ApiDoc({
+    summary: 'Request a sign-in code by SMS/WhatsApp (SMS21)',
+    tags: ['Auth'],
+    body: phoneRequestSchema,
+  })
+  async requestPhoneOtp(@Body() body: unknown, @Req() req: AppRequest) {
+    const dto = parse(phoneRequestSchema, body);
+    await this.ensurePhoneSignIn();
+    const out = await this.sms21.sendOtp({
+      mobile: `91${dto.phone}`,
+      purpose: 'login',
+      ip: clientIp(req),
+    });
+    return {
+      challengeId: out.requestId,
+      expiresInSeconds: out.expiresIn,
+      resendAfterSeconds: out.resendAfter,
+    };
+  }
+
+  @Post('phone/verify')
+  @HttpCode(200)
+  @Public()
+  @ApiDoc({
+    summary: 'Verify a phone code and start a session',
+    tags: ['Auth'],
+    body: phoneVerifySchema,
+  })
+  async verifyPhoneOtp(
+    @Body() body: unknown,
+    @Req() req: AppRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const dto = parse(phoneVerifySchema, body);
+    await this.ensurePhoneSignIn();
+    const mobile = `91${dto.phone}`;
+    let verified = false;
+    try {
+      const r = await this.sms21.verifyOtp({ requestId: dto.challengeId, otp: dto.code, mobile });
+      verified = r.verified === true;
+    } catch (e) {
+      // Map SMS21's OTP failures onto our auth error codes for a clean client message.
+      const code = (e as AppError).details?.providerCode;
+      const map: Record<string, ErrorCode> = {
+        OTP_INVALID: 'OTP_INVALID',
+        OTP_EXPIRED: 'OTP_EXPIRED',
+        OTP_ATTEMPTS_EXCEEDED: 'OTP_ATTEMPTS_EXCEEDED',
+      };
+      if (typeof code === 'string' && map[code])
+        throw new AppError(map[code], 'That code is not correct');
+      throw e;
+    }
+    if (!verified) throw new AppError('OTP_INVALID', 'That code is not correct');
+    const user = await this.db.user.upsert({
+      where: { phone: mobile },
+      create: { phone: mobile },
+      update: {},
+    });
+    return this.completeLogin(user, dto.client, dto.deviceName, req, res);
+  }
+
+  private async ensurePhoneSignIn() {
+    const cfg = await this.sms21.config();
+    if (!cfg.apiKeyEnc || !cfg.otpEnabled)
+      throw new AppError('MESSAGING_NOT_CONFIGURED', 'Phone sign-in is not available.');
+  }
+
+  /** Shared tail of email/phone sign-in: pre-select the sole shop, open a session, audit, respond. */
+  private async completeLogin(
+    user: User,
+    client: 'web' | 'mobile',
+    deviceName: string | undefined,
+    req: AppRequest,
+    res: Response,
+  ) {
+    const ipHash = hashIp(clientIp(req));
+    if (user.status !== 'ACTIVE') throw new AppError('UNAUTHENTICATED', 'This account is disabled');
     const memberships = await this.db.asUser(user.id, (tx) =>
       tx.membership.findMany({
         where: { userId: user.id, status: { in: ['ACTIVE', 'INVITED'] } },
@@ -73,11 +158,11 @@ export class AuthController {
     );
     const activeTenantId = memberships.length === 1 ? memberships[0].tenantId : null;
 
-    const kind = dto.client === 'mobile' ? 'MOBILE' : 'WEB';
+    const kind = client === 'mobile' ? 'MOBILE' : 'WEB';
     const created = await this.sessions.create(
       user.id,
       kind,
-      { userAgent: req.headers['user-agent'], ipHash, deviceName: dto.deviceName },
+      { userAgent: req.headers['user-agent'], ipHash, deviceName },
       activeTenantId,
     );
     if (activeTenantId) await this.acceptInvite(user.id, activeTenantId);

@@ -508,6 +508,13 @@ export const en = {
   'error.MESSAGING_NOT_CONFIGURED':
     'Messaging isn’t set up yet. Ask your admin to connect SMS/WhatsApp.',
   'error.MESSAGING_FAILED': 'Could not send the message. Please try again.',
+  'auth.email.tab': 'Email',
+  'auth.phone.tab': 'Phone',
+  'auth.phone.label': 'Mobile number',
+  'auth.phone.help': 'We’ll send a 6-digit code by SMS or WhatsApp.',
+  'auth.phone.invalid': 'Enter a valid 10-digit mobile number.',
+  'auth.phone.sent': 'We’ve sent a code to your phone.',
+  'auth.phone.change': 'Change number',
 } as const;
 
 export type TranslationKey = keyof typeof en;

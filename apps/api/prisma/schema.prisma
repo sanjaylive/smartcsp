@@ -20,7 +20,9 @@ datasource db {
 
 model User {
   id          String   @id @default(uuid(7)) @db.Uuid
-  email       String   @unique
+  // A user signs in by email or by phone; at least one is always set.
+  email       String?  @unique
+  phone       String?  @unique
   displayName String?
   locale      String   @default("en")
   status      String   @default("ACTIVE") // ACTIVE | DISABLED

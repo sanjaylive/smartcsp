@@ -495,4 +495,11 @@ export const hi: Record<TranslationKey, string> = {
   'error.MESSAGING_NOT_CONFIGURED':
     'मैसेजिंग अभी सेट नहीं है। एडमिन से SMS/WhatsApp कनेक्ट करने को कहें।',
   'error.MESSAGING_FAILED': 'संदेश नहीं भेजा जा सका। कृपया फिर से कोशिश करें।',
+  'auth.email.tab': 'ईमेल',
+  'auth.phone.tab': 'फ़ोन',
+  'auth.phone.label': 'मोबाइल नंबर',
+  'auth.phone.help': 'हम SMS या WhatsApp पर 6-अंकों का कोड भेजेंगे।',
+  'auth.phone.invalid': 'मान्य 10-अंकों का मोबाइल नंबर दर्ज करें।',
+  'auth.phone.sent': 'हमने आपके फ़ोन पर कोड भेज दिया है।',
+  'auth.phone.change': 'नंबर बदलें',
 };

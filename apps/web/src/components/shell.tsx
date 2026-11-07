@@ -238,7 +238,8 @@ function UserMenu({ me }: { me: Me }) {
       window.location.assign('/login');
     }
   };
-  const initial = (me.user.displayName ?? me.user.email).slice(0, 1).toUpperCase();
+  const identity = me.user.displayName ?? me.user.email ?? me.user.phone ?? '?';
+  const initial = identity.slice(0, 1).toUpperCase();
   return (
     <DM.Root>
       <DM.Trigger
@@ -256,8 +257,8 @@ function UserMenu({ me }: { me: Me }) {
           className="z-50 min-w-60 rounded-xl border border-border bg-surface p-1 shadow-xl"
         >
           <div className="px-3 py-2">
-            <p className="text-sm font-semibold">{me.user.displayName ?? me.user.email}</p>
-            <p className="text-xs text-fg-muted">{me.user.email}</p>
+            <p className="text-sm font-semibold">{identity}</p>
+            <p className="text-xs text-fg-muted">{me.user.email ?? me.user.phone}</p>
           </div>
           <DM.Separator className="my-1 h-px bg-border" />
           <DM.Item asChild>

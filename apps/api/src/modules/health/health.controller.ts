@@ -4,6 +4,7 @@ import { Public } from '../../common/access';
 import { BRAND_DEFAULTS } from '../admin/admin.controller';
 import { Db } from '../../common/db';
 import { RedisService } from '../../common/redis';
+import { Sms21Service } from '../messaging/sms21.service';
 import { AppError } from '../../common/errors';
 import { ApiDoc } from '../../common/http';
 
@@ -31,6 +32,7 @@ export class HealthController {
   constructor(
     private readonly db: Db,
     private readonly redis: RedisService,
+    private readonly sms21: Sms21Service,
   ) {}
 
   @Get('health')
@@ -75,6 +77,7 @@ export class HealthController {
       });
       const brand = (rows.find((r) => r.key === 'brand')?.value ?? {}) as Record<string, unknown>;
       const signups = rows.find((r) => r.key === 'signupsEnabled');
+      const sms = await this.sms21.publicConfig();
       return {
         brand: {
           name: typeof brand.name === 'string' && brand.name ? brand.name : BRAND_DEFAULTS.name,
@@ -94,6 +97,7 @@ export class HealthController {
           logoUrl: typeof brand.logoUrl === 'string' ? brand.logoUrl : BRAND_DEFAULTS.logoUrl,
         },
         signupsEnabled: signups ? signups.value === true : true,
+        phoneSignIn: sms.configured && sms.otpEnabled,
       };
     });
   }

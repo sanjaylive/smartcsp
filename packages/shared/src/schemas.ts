@@ -48,6 +48,17 @@ export const otpRequestSchema = z.object({
   email,
   consent: z.literal(true, { message: 'Please accept the terms and privacy notice' }),
 });
+export const phoneRequestSchema = z.object({
+  phone: indianMobile,
+  consent: z.literal(true, { message: 'Please accept the terms and privacy notice' }),
+});
+export const phoneVerifySchema = z.object({
+  challengeId: z.string().min(1).max(100),
+  phone: indianMobile,
+  code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
+  client: z.enum(['web', 'mobile']).default('web'),
+  deviceName: z.string().trim().max(80).optional(),
+});
 export const otpVerifySchema = z.object({
   challengeId: uuid,
   email,

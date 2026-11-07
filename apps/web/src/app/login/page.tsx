@@ -4,9 +4,18 @@ import { Suspense, useCallback, useEffect, useState, type FormEvent, type ReactN
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, BookOpenCheck, Mail, ShieldCheck, WalletMinimal, WifiOff } from 'lucide-react';
+import {
+  ArrowLeft,
+  BookOpenCheck,
+  Mail,
+  Phone,
+  ShieldCheck,
+  WalletMinimal,
+  WifiOff,
+} from 'lucide-react';
 import { otpRequestSchema } from '@csp2all/shared';
 import { useBrand } from '@/lib/brand';
+import { cn } from '@/lib/cn';
 import { LanguageToggle, ThemeToggle } from '@/components/toggles';
 import { Alert, Button, Checkbox, Field, Input } from '@/components/ui';
 import { OtpInput } from '@/components/otp-input';
@@ -123,16 +132,21 @@ function useCountdown(target: number | null) {
   return target ? Math.max(0, Math.ceil((target - now) / 1000)) : 0;
 }
 
+type Channel = 'email' | 'phone';
+
 function LoginInner() {
   const { t } = useI18n();
   const router = useRouter();
   const params = useSearchParams();
   const qc = useQueryClient();
   const next = params.get('next');
-  const [step, setStep] = useState<'email' | 'otp'>('email');
+  const [channel, setChannel] = useState<Channel>('email');
+  const [phoneSignIn, setPhoneSignIn] = useState(false);
+  const [step, setStep] = useState<'enter' | 'otp'>('enter');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [consent, setConsent] = useState(false);
-  const [emailError, setEmailError] = useState<string | null>(null);
+  const [idError, setIdError] = useState<string | null>(null);
   const [consentError, setConsentError] = useState<string | null>(null);
   const [challenge, setChallenge] = useState<OtpChallenge | null>(null);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
@@ -143,6 +157,7 @@ function LoginInner() {
   const [notice, setNotice] = useState<string | null>(null);
   const expiresIn = useCountdown(expiresAt);
   const resendIn = useCountdown(resendAt);
+  const identity = channel === 'phone' ? `+91 ${phone}` : email;
 
   // Already signed in? Skip the form.
   useEffect(() => {
@@ -152,48 +167,65 @@ function LoginInner() {
       .catch(() => undefined);
   }, [params, router, next]);
 
+  // Offer phone sign-in only when the platform has it configured.
+  useEffect(() => {
+    api<{ phoneSignIn?: boolean }>('/v1/public/config', { noAuthRedirect: true })
+      .then((c) => setPhoneSignIn(!!c.phoneSignIn))
+      .catch(() => undefined);
+  }, []);
+
   const requestCode = useCallback(
     async (isResend: boolean) => {
       setError(null);
       setBusy(true);
       try {
-        const c = await api<OtpChallenge>('/v1/auth/otp/request', {
-          method: 'POST',
-          body: { email, consent: true },
-          noAuthRedirect: true,
-        });
+        const path = channel === 'phone' ? '/v1/auth/phone/request' : '/v1/auth/otp/request';
+        const body = channel === 'phone' ? { phone, consent: true } : { email, consent: true };
+        const c = await api<OtpChallenge>(path, { method: 'POST', body, noAuthRedirect: true });
         setChallenge(c);
         setExpiresAt(Date.now() + c.expiresInSeconds * 1000);
         setResendAt(Date.now() + c.resendAfterSeconds * 1000);
         setCode('');
         setStep('otp');
-        setNotice(isResend ? t('login.resent') : t('auth.email.sent'));
+        setNotice(
+          isResend
+            ? t('login.resent')
+            : t(channel === 'phone' ? 'auth.phone.sent' : 'auth.email.sent'),
+        );
       } catch (e) {
         if (isApiError(e, 'OTP_RESEND_COOLDOWN')) {
           const wait = Number(e.details.retryAfterSeconds ?? 30);
           setResendAt(Date.now() + wait * 1000);
           setError(t('error.OTP_RESEND_COOLDOWN'));
-        } else if (isApiError(e) && e.fields.email) {
-          setEmailError(e.fields.email[0]);
+        } else if (isApiError(e) && (e.fields.email || e.fields.phone)) {
+          setIdError((e.fields.email ?? e.fields.phone)?.[0] ?? null);
         } else setError(errorMessage(t, e));
       } finally {
         setBusy(false);
       }
     },
-    [email, t],
+    [channel, email, phone, t],
   );
 
-  const submitEmail = async (e: FormEvent) => {
+  const submitEnter = async (e: FormEvent) => {
     e.preventDefault();
-    setEmailError(null);
+    setIdError(null);
     setConsentError(null);
-    const r = otpRequestSchema.safeParse({ email, consent });
-    if (!r.success) {
-      for (const issue of r.error.issues) {
-        if (issue.path[0] === 'email') setEmailError(t('login.emailInvalid'));
-        if (issue.path[0] === 'consent') setConsentError(t('login.consentRequired'));
-      }
+    if (!consent) {
+      setConsentError(t('login.consentRequired'));
       return;
+    }
+    if (channel === 'phone') {
+      if (!/^[6-9]\d{9}$/.test(phone)) {
+        setIdError(t('auth.phone.invalid'));
+        return;
+      }
+    } else {
+      const r = otpRequestSchema.safeParse({ email, consent });
+      if (!r.success) {
+        setIdError(t('login.emailInvalid'));
+        return;
+      }
     }
     await requestCode(false);
   };
@@ -204,11 +236,12 @@ function LoginInner() {
       setBusy(true);
       setError(null);
       try {
-        const me = await api<Me>('/v1/auth/otp/verify', {
-          method: 'POST',
-          body: { challengeId: challenge.challengeId, email, code: value, client: 'web' },
-          noAuthRedirect: true,
-        });
+        const path = channel === 'phone' ? '/v1/auth/phone/verify' : '/v1/auth/otp/verify';
+        const body =
+          channel === 'phone'
+            ? { challengeId: challenge.challengeId, phone, code: value, client: 'web' }
+            : { challengeId: challenge.challengeId, email, code: value, client: 'web' };
+        const me = await api<Me>(path, { method: 'POST', body, noAuthRedirect: true });
         qc.clear();
         qc.setQueryData(qk.me, me);
         router.replace(routeAfterAuth(me, next));
@@ -220,8 +253,14 @@ function LoginInner() {
         } else setError(errorMessage(t, e));
       }
     },
-    [challenge, email, next, qc, router, t],
+    [challenge, channel, email, phone, next, qc, router, t],
   );
+
+  const switchChannel = (c: Channel) => {
+    setChannel(c);
+    setIdError(null);
+    setError(null);
+  };
 
   const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
@@ -232,11 +271,15 @@ function LoginInner() {
           {t('error.SESSION_EXPIRED')}
         </Alert>
       ) : null}
-      {step === 'email' ? (
-        <form onSubmit={submitEmail} noValidate className="flex flex-col gap-5">
+      {step === 'enter' ? (
+        <form onSubmit={submitEnter} noValidate className="flex flex-col gap-5">
           <div className="flex items-center gap-3">
             <span className="flex size-11 items-center justify-center rounded-xl bg-brand-bg text-brand-strong dark:text-fg">
-              <Mail aria-hidden className="size-5" />
+              {channel === 'phone' ? (
+                <Phone aria-hidden className="size-5" />
+              ) : (
+                <Mail aria-hidden className="size-5" />
+              )}
             </span>
             <div>
               <h1 className="font-display text-2xl font-extrabold tracking-tight">
@@ -245,26 +288,74 @@ function LoginInner() {
               <p className="text-sm text-fg-muted">{t('login.subtitle')}</p>
             </div>
           </div>
-          <Field
-            label={t('auth.email.label')}
-            help={t('auth.email.help')}
-            error={emailError}
-            required
-          >
-            {({ id, describedBy, invalid }) => (
-              <Input
-                id={id}
-                type="email"
-                autoComplete="email"
-                inputMode="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                aria-describedby={describedBy}
-                aria-invalid={invalid || undefined}
-                autoFocus
-              />
-            )}
-          </Field>
+          {phoneSignIn && (
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1" role="tablist">
+              {(['email', 'phone'] as const).map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  role="tab"
+                  aria-selected={channel === c}
+                  onClick={() => switchChannel(c)}
+                  className={cn(
+                    'min-h-9 rounded-lg text-sm font-semibold transition',
+                    channel === c ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg',
+                  )}
+                >
+                  {t(c === 'phone' ? 'auth.phone.tab' : 'auth.email.tab')}
+                </button>
+              ))}
+            </div>
+          )}
+          {channel === 'phone' ? (
+            <Field
+              label={t('auth.phone.label')}
+              help={t('auth.phone.help')}
+              error={idError}
+              required
+            >
+              {({ id, describedBy, invalid }) => (
+                <div className="flex items-stretch gap-2">
+                  <span className="inline-flex items-center rounded-[10px] border border-border bg-surface-muted px-3 text-[15px] font-semibold text-fg-muted">
+                    +91
+                  </span>
+                  <Input
+                    id={id}
+                    type="tel"
+                    autoComplete="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    aria-describedby={describedBy}
+                    aria-invalid={invalid || undefined}
+                    autoFocus
+                  />
+                </div>
+              )}
+            </Field>
+          ) : (
+            <Field
+              label={t('auth.email.label')}
+              help={t('auth.email.help')}
+              error={idError}
+              required
+            >
+              {({ id, describedBy, invalid }) => (
+                <Input
+                  id={id}
+                  type="email"
+                  autoComplete="email"
+                  inputMode="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  aria-describedby={describedBy}
+                  aria-invalid={invalid || undefined}
+                  autoFocus
+                />
+              )}
+            </Field>
+          )}
           <div>
             <Checkbox
               checked={consent}
@@ -335,7 +426,7 @@ function LoginInner() {
               }}
             />
             <p id="otp-help" className="text-[13px] text-fg-muted">
-              {t('auth.otp.help', { email })}{' '}
+              {t('auth.otp.help', { email: identity })}{' '}
               {expiresIn > 0 ? (
                 <span className="money">{t('login.expiresIn', { time: mmss(expiresIn) })}</span>
               ) : (
@@ -360,13 +451,13 @@ function LoginInner() {
               variant="ghost"
               icon={<ArrowLeft aria-hidden className="size-4" />}
               onClick={() => {
-                setStep('email');
+                setStep('enter');
                 setError(null);
                 setNotice(null);
                 setCode('');
               }}
             >
-              {t('auth.otp.changeEmail')}
+              {t(channel === 'phone' ? 'auth.phone.change' : 'auth.otp.changeEmail')}
             </Button>
           </div>
         </form>

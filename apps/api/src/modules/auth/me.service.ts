@@ -20,6 +20,7 @@ export class MeService {
         user: {
           id: user.id,
           email: user.email,
+          phone: user.phone,
           displayName: user.displayName,
           locale: user.locale,
         },

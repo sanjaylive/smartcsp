@@ -911,7 +911,7 @@ export class AdminController {
           where: { tenantId: s.tenantId, role: 'OWNER' },
           include: { user: true },
         });
-        if (owner) {
+        if (owner?.user.email) {
           await this.email.sendInTx(
             tx,
             this.email.simple(

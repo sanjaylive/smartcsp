@@ -28,7 +28,13 @@ export interface MeTenant {
 }
 
 export interface Me {
-  user: { id: string; email: string; displayName: string | null; locale: string | null };
+  user: {
+    id: string;
+    email: string | null;
+    phone?: string | null;
+    displayName: string | null;
+    locale: string | null;
+  };
   activeTenantId: string | null;
   tenants: MeTenant[];
   onboarding: { step: string } | null;
