@@ -503,6 +503,11 @@ export const en = {
   'landing.footer.independent':
     'Smart Outlet is an independent record-keeping tool, not affiliated with any bank, payment network or government body.',
   'login.subtitle': 'Sign in or create your shop with a one-time email code.',
+  'customer.sendReminder': 'Send reminder',
+  'customer.reminderSent': 'Reminder sent to the customer.',
+  'error.MESSAGING_NOT_CONFIGURED':
+    'Messaging isn’t set up yet. Ask your admin to connect SMS/WhatsApp.',
+  'error.MESSAGING_FAILED': 'Could not send the message. Please try again.',
 } as const;
 
 export type TranslationKey = keyof typeof en;

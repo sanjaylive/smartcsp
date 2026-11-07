@@ -3,7 +3,7 @@
 import { use, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, ArchiveRestore, HandCoins, Pencil, Plus, UserRound } from 'lucide-react';
+import { Archive, ArchiveRestore, HandCoins, Pencil, Plus, Send, UserRound } from 'lucide-react';
 import { formatDate, formatDateTime } from '@csp2all/shared';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
@@ -47,6 +47,11 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
     },
     onError: (e) => toast('error', errorMessage(t, e)),
   });
+  const remind = useMutation({
+    mutationFn: () => api(`/v1/customers/${id}/remind`, { method: 'POST', body: {} }),
+    onSuccess: () => toast('success', t('customer.reminderSent')),
+    onError: (e) => toast('error', errorMessage(t, e)),
+  });
 
   return (
     <QueryState query={q} rows={5}>
@@ -78,6 +83,16 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
                 ) : null}
                 {can('customers.manage') ? (
                   <>
+                    {c.phone && !c.archivedAt ? (
+                      <Button
+                        variant="outline"
+                        loading={remind.isPending}
+                        icon={<Send aria-hidden className="size-4" />}
+                        onClick={() => remind.mutate()}
+                      >
+                        {t('customer.sendReminder')}
+                      </Button>
+                    ) : null}
                     <Button
                       variant="outline"
                       icon={<Pencil aria-hidden className="size-4" />}

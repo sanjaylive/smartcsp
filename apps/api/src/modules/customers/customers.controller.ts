@@ -29,6 +29,7 @@ import { AppError, notFound, versionConflict } from '../../common/errors';
 import { AuditService } from '../../common/audit';
 import { d, n, pageResult, paginate, toDate } from '../../common/serialize';
 import { visibleWhere } from '../records/records.service';
+import { Sms21Service } from '../messaging/sms21.service';
 
 export function customerJson(ctx: TenantCtx, c: Customer) {
   const sensitive = ctx.permissions.has('customers.view_sensitive');
@@ -56,6 +57,7 @@ export class CustomersController {
   constructor(
     private readonly db: Db,
     private readonly audit: AuditService,
+    private readonly sms21: Sms21Service,
   ) {}
 
   @Get()
@@ -278,6 +280,64 @@ export class CustomersController {
       });
       return customerJson(ctx, u);
     });
+  }
+
+  @Post(':id/remind')
+  @HttpCode(200)
+  @TenantAccess('customers.manage')
+  @ApiDoc({
+    summary: 'Send a WhatsApp/SMS reminder to the customer (via SMS21)',
+    tags: ['Customers'],
+  })
+  async remind(
+    @Ctx() ctx: TenantCtx,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    const dto = parse(z.object({ text: z.string().trim().max(400).optional() }), body);
+    const cfg = await this.sms21.config();
+    if (!cfg.apiKeyEnc)
+      throw new AppError('MESSAGING_NOT_CONFIGURED', 'SMS/WhatsApp is not connected yet.');
+    if (!cfg.notifyEnabled)
+      throw new AppError('MESSAGING_NOT_CONFIGURED', 'Customer reminders are turned off.');
+
+    const { customer, shopName } = await this.db.inTenant(ctx, async (tx) => {
+      const c = await tx.customer.findFirst({
+        where: { id, tenantId: ctx.tenantId },
+        select: { id: true, name: true, phone: true, archivedAt: true },
+      });
+      if (!c) throw notFound('Customer');
+      const shop = await tx.tenant.findUnique({
+        where: { id: ctx.tenantId },
+        select: { name: true },
+      });
+      return { customer: c, shopName: shop?.name ?? 'our shop' };
+    });
+    if (!customer.phone)
+      throw new AppError('VALIDATION_FAILED', 'This customer has no phone number.', undefined, {
+        phone: ['Add a phone number first'],
+      });
+
+    const text =
+      dto.text ||
+      `Dear ${customer.name}, this is a reminder from ${shopName} about your pending dues. Please visit us to settle them. Thank you.`;
+    const res = (await this.sms21.notify(customer.phone, text)) as {
+      messageId?: string;
+      requestId?: string;
+    };
+    await this.db.inTenant(ctx, (tx) =>
+      this.audit.tenant(tx, ctx, {
+        action: 'customer.reminder_sent',
+        targetType: 'customer',
+        targetId: id,
+        data: { channel: cfg.otpChannel },
+      }),
+    );
+    return {
+      sent: true,
+      channel: cfg.otpChannel,
+      messageId: res.messageId ?? res.requestId ?? null,
+    };
   }
 }
 

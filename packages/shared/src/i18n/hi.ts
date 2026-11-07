@@ -490,4 +490,9 @@ export const hi: Record<TranslationKey, string> = {
   'landing.footer.independent':
     'स्मार्ट आउटलेट एक स्वतंत्र रिकॉर्ड-कीपिंग टूल है, जो किसी बैंक, भुगतान नेटवर्क या सरकारी संस्था से जुड़ा नहीं है।',
   'login.subtitle': 'ईमेल पर आए एक-बार के कोड से साइन इन करें या अपनी दुकान बनाएँ।',
+  'customer.sendReminder': 'रिमाइंडर भेजें',
+  'customer.reminderSent': 'ग्राहक को रिमाइंडर भेज दिया गया।',
+  'error.MESSAGING_NOT_CONFIGURED':
+    'मैसेजिंग अभी सेट नहीं है। एडमिन से SMS/WhatsApp कनेक्ट करने को कहें।',
+  'error.MESSAGING_FAILED': 'संदेश नहीं भेजा जा सका। कृपया फिर से कोशिश करें।',
 };

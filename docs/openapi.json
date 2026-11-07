@@ -3325,6 +3325,67 @@
         ]
       }
     },
+    "/v1/customers/{id}/remind": {
+      "post": {
+        "summary": "Send a WhatsApp/SMS reminder to the customer (via SMS21)",
+        "tags": [
+          "Customers"
+        ],
+        "operationId": "Customers_remind",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "customers.manage"
+        ]
+      }
+    },
     "/v1/follow-ups": {
       "get": {
         "summary": "List follow-up tasks",
