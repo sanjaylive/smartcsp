@@ -38,6 +38,7 @@ import { planVersionJson, SubscriptionService } from '../subscription/subscripti
 import { SessionService } from '../auth/session.service';
 import { normalizeEmail } from '../auth/otp.service';
 import { EmailService } from '../email/email.service';
+import { Sms21Service } from '../messaging/sms21.service';
 import { StorageService } from '../storage/storage.service';
 
 const tenantListQuery = pagination.extend({
@@ -103,6 +104,20 @@ export const BRAND_DEFAULTS = {
   logoUrl: '',
 } as const;
 
+const sms21Schema = z.object({
+  apiKey: z
+    .string()
+    .trim()
+    .max(200)
+    .optional()
+    .transform((v) => (v ? v : undefined)),
+  baseUrl: z.string().url().max(200).default('https://api.sms21.in/v1'),
+  otpEnabled: z.boolean().default(false),
+  otpChannel: z.enum(['sms', 'whatsapp']).default('whatsapp'),
+  notifyEnabled: z.boolean().default(false),
+  senderId: z.string().trim().max(16).default(''),
+});
+
 @Controller('v1/admin')
 export class AdminController {
   constructor(
@@ -114,6 +129,7 @@ export class AdminController {
     private readonly sessions: SessionService,
     private readonly email: EmailService,
     private readonly storage: StorageService,
+    private readonly sms21: Sms21Service,
   ) {}
 
   private actor(auth: AuthState, req: AppRequest) {
@@ -1245,6 +1261,52 @@ export class AdminController {
       });
       return s;
     });
+  }
+
+  // ---------------------------------------------------------------- SMS21 messaging
+
+  @Get('sms21')
+  @AdminAccess('platform.view')
+  @ApiDoc({ summary: 'SMS & WhatsApp (SMS21) configuration', tags: ['Admin'] })
+  sms21Config() {
+    return this.sms21.publicConfig();
+  }
+
+  @Put('sms21')
+  @AdminAccess('settings.manage')
+  @ApiDoc({ summary: 'Configure SMS & WhatsApp (SMS21)', tags: ['Admin'] })
+  async setSms21(@Body() body: unknown, @Auth() auth: AuthState, @Req() req: AppRequest) {
+    const dto = parse(sms21Schema, body);
+    const saved = await this.sms21.save(dto);
+    await this.db.asSystem((tx) =>
+      this.audit.platform(tx, this.actor(auth, req), {
+        action: 'admin.sms21_updated',
+        targetType: 'setting',
+        targetId: 'sms21',
+        data: {
+          baseUrl: saved.baseUrl,
+          otpEnabled: saved.otpEnabled,
+          otpChannel: saved.otpChannel,
+          notifyEnabled: saved.notifyEnabled,
+          keyChanged: !!dto.apiKey,
+        },
+      }),
+    );
+    return this.sms21.publicConfig();
+  }
+
+  @Post('sms21/test')
+  @AdminAccess('settings.manage')
+  @ApiDoc({ summary: 'Test the SMS21 connection (key + wallet)', tags: ['Admin'] })
+  async testSms21() {
+    const info = await this.sms21.keyInfo();
+    const wallet = await this.sms21.wallet().catch(() => null);
+    return {
+      ok: true,
+      environment: info.environment ?? null,
+      scopes: info.scopes ?? [],
+      wallet,
+    };
   }
 
   // ---------------------------------------------------------------- platform admins

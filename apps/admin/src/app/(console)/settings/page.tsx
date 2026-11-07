@@ -14,9 +14,10 @@ import {
   Input,
   PageHeader,
   QueryState,
+  Select,
   Switch,
 } from '@/components/ui';
-import { get, isApiError, put } from '@/lib/api';
+import { get, isApiError, post, put } from '@/lib/api';
 import { dt } from '@/lib/format';
 import { useCan } from '@/lib/session';
 import type { PlatformSetting } from '@/lib/types';
@@ -78,10 +79,11 @@ function SettingsInner() {
       <QueryState query={q}>
         {(d) => {
           const val = (k: string) => d.items.find((i) => i.key === k);
-          const known = ['dataRetention', 'signupsEnabled', 'supportContact', 'brand'];
+          const known = ['dataRetention', 'signupsEnabled', 'supportContact', 'brand', 'sms21'];
           return (
             <div className="grid gap-4 xl:grid-cols-2">
               <BrandCard setting={val('brand')} editable={editable} />
+              <Sms21Card editable={editable} />
               <div className="flex flex-col gap-4">
                 <SignupsCard setting={val('signupsEnabled')} editable={editable} />
                 <SupportContactCard setting={val('supportContact')} editable={editable} />
@@ -366,6 +368,230 @@ function BrandCard({ setting, editable }: { setting?: PlatformSetting; editable:
         )}
       </form>
     </Card>
+  );
+}
+
+interface Sms21Public {
+  configured: boolean;
+  baseUrl: string;
+  apiKeyMasked: string;
+  otpEnabled: boolean;
+  otpChannel: 'sms' | 'whatsapp';
+  notifyEnabled: boolean;
+  senderId: string;
+  testMode: boolean;
+}
+
+function Sms21Card({ editable }: { editable: boolean }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const q = useQuery({ queryKey: ['sms21'], queryFn: () => get<Sms21Public>('/v1/admin/sms21') });
+  return (
+    <Card
+      title="SMS & WhatsApp (SMS21)"
+      className="xl:col-span-2"
+      actions={
+        q.data ? (
+          <Badge tone={q.data.configured ? 'success' : 'warning'}>
+            {q.data.configured ? (q.data.testMode ? 'Test key' : 'Connected') : 'Not connected'}
+          </Badge>
+        ) : undefined
+      }
+    >
+      <QueryState query={q}>
+        {(d) => <Sms21Form data={d} editable={editable} qc={qc} toast={toast} />}
+      </QueryState>
+    </Card>
+  );
+}
+
+function Sms21Form({
+  data,
+  editable,
+  qc,
+  toast,
+}: {
+  data: Sms21Public;
+  editable: boolean;
+  qc: ReturnType<typeof useQueryClient>;
+  toast: ReturnType<typeof useToast>;
+}) {
+  const [apiKey, setApiKey] = useState('');
+  const [baseUrl, setBaseUrl] = useState(data.baseUrl);
+  const [otpEnabled, setOtpEnabled] = useState(data.otpEnabled);
+  const [otpChannel, setOtpChannel] = useState<'sms' | 'whatsapp'>(data.otpChannel);
+  const [notifyEnabled, setNotifyEnabled] = useState(data.notifyEnabled);
+  const [senderId, setSenderId] = useState(data.senderId);
+
+  const save = useMutation({
+    mutationFn: () =>
+      put('/v1/admin/sms21', {
+        ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
+        baseUrl,
+        otpEnabled,
+        otpChannel,
+        notifyEnabled,
+        senderId,
+      }),
+    onSuccess: () => {
+      toast.success('SMS21 settings saved.');
+      setApiKey('');
+      void qc.invalidateQueries({ queryKey: ['sms21'] });
+    },
+  });
+
+  const test = useMutation({
+    mutationFn: () =>
+      post<{ ok: boolean; environment: string | null; scopes: string[]; wallet: unknown }>(
+        '/v1/admin/sms21/test',
+      ),
+  });
+  const wallet = test.data?.wallet as { balance?: number; currency?: string } | null | undefined;
+
+  const err = (k: string) => (isApiError(save.error) ? save.error.field(`value.${k}`) : undefined);
+  return (
+    <form
+      className="flex flex-col gap-4"
+      noValidate
+      onSubmit={(e) => {
+        e.preventDefault();
+        save.mutate();
+      }}
+    >
+      <p className="text-[13px] text-fg-muted">
+        Connect your SMS21 account (api.sms21.in) to send sign-in codes and reminders over SMS and
+        WhatsApp. The API key is stored encrypted and never shown again. Test keys (sms21_test_…)
+        don’t deliver or charge.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field
+          label="API key"
+          hint={
+            data.configured
+              ? `Saved: ${data.apiKeyMasked} — leave blank to keep`
+              : 'sms21_live_… or sms21_test_…'
+          }
+          error={err('apiKey')}
+        >
+          {(p) => (
+            <Input
+              {...p}
+              type="password"
+              autoComplete="off"
+              value={apiKey}
+              placeholder={data.configured ? '••••••••' : 'sms21_…'}
+              disabled={!editable}
+              onChange={(e) => setApiKey(e.target.value)}
+            />
+          )}
+        </Field>
+        <Field label="API base URL" error={err('baseUrl')}>
+          {(p) => (
+            <Input
+              {...p}
+              type="url"
+              value={baseUrl}
+              disabled={!editable}
+              onChange={(e) => setBaseUrl(e.target.value)}
+            />
+          )}
+        </Field>
+      </div>
+
+      <div className="rounded-xl border border-border p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold">Phone sign-in (OTP)</p>
+            <p className="text-[13px] text-fg-muted">
+              Let shops sign in with a code sent to their phone.
+            </p>
+          </div>
+          <Switch
+            checked={otpEnabled}
+            label="Enable phone sign-in"
+            disabled={!editable}
+            onChange={setOtpEnabled}
+          />
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-border p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold">Customer reminders</p>
+            <p className="text-[13px] text-fg-muted">
+              Send due and follow-up reminders to customers over WhatsApp/SMS.
+            </p>
+          </div>
+          <Switch
+            checked={notifyEnabled}
+            label="Enable customer reminders"
+            disabled={!editable}
+            onChange={setNotifyEnabled}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Preferred channel" hint="WhatsApp falls back to SMS">
+          {(p) => (
+            <Select
+              {...p}
+              value={otpChannel}
+              disabled={!editable}
+              onChange={(e) => setOtpChannel(e.target.value as 'sms' | 'whatsapp')}
+            >
+              <option value="whatsapp">WhatsApp (SMS fallback)</option>
+              <option value="sms">SMS</option>
+            </Select>
+          )}
+        </Field>
+        <Field label="SMS sender ID" hint="Approved DLT header for live SMS (optional)">
+          {(p) => (
+            <Input
+              {...p}
+              value={senderId}
+              maxLength={16}
+              disabled={!editable}
+              onChange={(e) => setSenderId(e.target.value)}
+            />
+          )}
+        </Field>
+      </div>
+
+      {test.data?.ok && (
+        <p className="rounded-lg bg-success-bg px-3 py-2 text-[13px] font-medium text-success">
+          Connected to SMS21 ({test.data.environment ?? 'unknown'} environment)
+          {wallet && typeof wallet.balance === 'number'
+            ? ` · wallet ${wallet.balance} ${wallet.currency ?? ''}`.trimEnd()
+            : ''}
+          .
+        </p>
+      )}
+      {test.error && (
+        <p className="rounded-lg bg-danger-bg px-3 py-2 text-[13px] font-medium text-danger">
+          {isApiError(test.error) ? test.error.message : 'Connection test failed.'}
+        </p>
+      )}
+
+      <FormError error={save.error} />
+      {editable && (
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" variant="primary" loading={save.isPending}>
+            Save SMS21 settings
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            loading={test.isPending}
+            disabled={!data.configured && !apiKey.trim()}
+            onClick={() => test.mutate()}
+          >
+            Test connection
+          </Button>
+        </div>
+      )}
+    </form>
   );
 }
 

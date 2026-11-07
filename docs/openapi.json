@@ -95,6 +95,48 @@
         "security": []
       }
     },
+    "/v1/public/config": {
+      "get": {
+        "summary": "Public branding and configuration",
+        "tags": [
+          "Operations"
+        ],
+        "operationId": "Health_publicConfig",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
     "/metrics": {
       "get": {
         "summary": "Prometheus metrics (Bearer METRICS_TOKEN when configured; block at the public proxy)",
@@ -10315,6 +10357,154 @@
         ]
       }
     },
+    "/v1/admin/sms21": {
+      "get": {
+        "summary": "SMS & WhatsApp (SMS21) configuration",
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "Admin_sms21Config",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "x-platform-permissions": [
+          "platform.view"
+        ]
+      },
+      "put": {
+        "summary": "Configure SMS & WhatsApp (SMS21)",
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "Admin_setSms21",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "x-platform-permissions": [
+          "settings.manage"
+        ]
+      }
+    },
+    "/v1/admin/sms21/test": {
+      "post": {
+        "summary": "Test the SMS21 connection (key + wallet)",
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "Admin_testSms21",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "x-platform-permissions": [
+          "settings.manage"
+        ]
+      }
+    },
     "/v1/admin/admins": {
       "get": {
         "summary": "Platform administrators",
@@ -11046,6 +11236,8 @@
                   "CONNECTOR_UNAVAILABLE",
                   "PROVIDER_OUTCOME_UNKNOWN",
                   "FILE_REJECTED",
+                  "MESSAGING_NOT_CONFIGURED",
+                  "MESSAGING_FAILED",
                   "INTERNAL_ERROR"
                 ]
               },
