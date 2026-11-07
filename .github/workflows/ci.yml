@@ -9,7 +9,7 @@ concurrency:
 
 jobs:
   node:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     services:
       postgres:
@@ -26,9 +26,9 @@ jobs:
       TEST_OWNER_DATABASE_URL: postgresql://csp2all_owner:owner_ci@127.0.0.1:5432/csp2all_test
       TEST_REDIS_URL: redis://127.0.0.1:6379/3
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with: { node-version: 24, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - name: Create database roles (owner + RLS-restricted app role)
@@ -69,19 +69,19 @@ jobs:
         run: pnpm --filter @csp2all/api openapi && git diff --exit-code docs/openapi.json
 
   docker:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: node
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker build -f infra/docker/api.Dockerfile -t csp2all-api:ci .
       - run: docker build -f infra/docker/next.Dockerfile --build-arg APP=web -t csp2all-web:ci .
       - run: docker build -f infra/docker/next.Dockerfile --build-arg APP=admin -t csp2all-admin:ci .
 
   mobile:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults: { run: { working-directory: apps/mobile } }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with: { channel: stable, cache: true }
       - run: flutter pub get
