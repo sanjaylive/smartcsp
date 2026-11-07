@@ -13,21 +13,27 @@ async function main() {
   const email = z.email().parse((idx >= 0 ? process.argv[idx + 1] : '')?.trim().toLowerCase());
   const db = new PrismaClient();
   try {
-    const existing = await db.platformAdmin.count({
-      where: { role: 'SUPER_ADMIN', status: 'ACTIVE' },
-    });
-    if (existing > 0)
-      throw new Error('A super admin already exists. Add more admins from the admin portal.');
-    const user = await db.user.upsert({ where: { email }, create: { email }, update: {} });
-    await db.platformAdmin.create({ data: { userId: user.id, role: 'SUPER_ADMIN' } });
-    await db.auditEvent.create({
-      data: {
-        actorType: 'SYSTEM',
-        action: 'admin.bootstrap',
-        targetType: 'user',
-        targetId: user.id,
-        data: { email },
-      },
+    // One transaction with the system RLS bypass (as reference-data.ts does): the audit row has no
+    // tenant, so the app role cannot see it back from INSERT … RETURNING without it, and a partial
+    // bootstrap (admin created, audit missing) must not be possible.
+    await db.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('app.rls_bypass', 'on', true)`;
+      const existing = await tx.platformAdmin.count({
+        where: { role: 'SUPER_ADMIN', status: 'ACTIVE' },
+      });
+      if (existing > 0)
+        throw new Error('A super admin already exists. Add more admins from the admin portal.');
+      const user = await tx.user.upsert({ where: { email }, create: { email }, update: {} });
+      await tx.platformAdmin.create({ data: { userId: user.id, role: 'SUPER_ADMIN' } });
+      await tx.auditEvent.create({
+        data: {
+          actorType: 'SYSTEM',
+          action: 'admin.bootstrap',
+          targetType: 'user',
+          targetId: user.id,
+          data: { email },
+        },
+      });
     });
     // eslint-disable-next-line no-console
     console.log(
