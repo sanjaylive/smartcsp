@@ -1,7 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, Check, Minus, Plus, WalletMinimal } from 'lucide-react';
+import {
+  ArrowRight,
+  Check,
+  ClipboardList,
+  FileSpreadsheet,
+  HandCoins,
+  Landmark,
+  Minus,
+  Plus,
+  Store,
+  UsersRound,
+  WalletMinimal,
+  WifiOff,
+} from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useBrand } from '@/lib/brand';
 import { LanguageToggle } from '@/components/toggles';
@@ -51,18 +64,41 @@ function Btn({
   );
 }
 
+function SectionHead({
+  eyebrow,
+  title,
+  sub,
+  center,
+}: {
+  eyebrow?: string;
+  title: string;
+  sub?: string;
+  center?: boolean;
+}) {
+  return (
+    <div className={center ? 'mx-auto max-w-2xl text-center' : 'max-w-2xl'}>
+      {eyebrow && (
+        <p className="mb-2 text-sm font-bold uppercase tracking-wide text-brand">{eyebrow}</p>
+      )}
+      <h2 className="text-3xl font-extrabold tracking-tight sm:text-[2.1rem]">{title}</h2>
+      {sub && <p className="mt-3 text-lg text-fg-muted">{sub}</p>}
+    </div>
+  );
+}
+
 function Header() {
   const { t } = useI18n();
   const nav = [
-    ['#work', t('landing.nav.features')],
-    ['#pricing', t('landing.nav.pricing')],
+    ['#capabilities', t('landing.nav.features')],
+    ['#day', t('landing.nav.howItWorks')],
+    ['#start', t('landing.nav.getStarted')],
     ['#faq', t('landing.nav.faq')],
   ] as const;
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-bg/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4">
         <BrandMark />
-        <nav aria-label="Primary" className="hidden items-center gap-6 md:flex">
+        <nav aria-label="Primary" className="hidden items-center gap-6 lg:flex">
           {nav.map(([href, label]) => (
             <a key={href} href={href} className="text-sm font-semibold text-fg-muted hover:text-fg">
               {label}
@@ -77,7 +113,7 @@ function Header() {
           >
             {t('landing.cta.signin')}
           </Link>
-          <Btn href="/login">{t('landing.cta.start')}</Btn>
+          <Btn href="/register">{t('landing.cta.create')}</Btn>
         </div>
       </div>
     </header>
@@ -100,7 +136,6 @@ function Chip({ tone, children }: { tone: 'success' | 'warning'; children: React
   return <span className={`rounded px-2 py-0.5 text-xs font-semibold ${cls}`}>{children}</span>;
 }
 
-/* A faithful, legible recreation of the daily dashboard. */
 function DashboardScreen() {
   const { t } = useI18n();
   const brand = useBrand();
@@ -287,11 +322,11 @@ function Hero() {
           </h1>
           <p className="mt-5 max-w-xl text-lg text-fg-muted">{t('landing.hero.sub')}</p>
           <div className="mt-7 flex flex-wrap items-center gap-3">
-            <Btn href="/login">
-              {t('landing.cta.start')}
+            <Btn href="/register">
+              {t('landing.cta.create')}
               <ArrowRight className="size-4" />
             </Btn>
-            <Btn href="#work" variant="outline">
+            <Btn href="#day" variant="outline">
               {t('landing.seeHow')}
             </Btn>
           </div>
@@ -326,6 +361,42 @@ function TrustStrip() {
   );
 }
 
+/* 2. What you can do — a compact capability list (not cards). */
+function Capabilities() {
+  const { t } = useI18n();
+  const caps = [
+    [ClipboardList, '1'],
+    [WalletMinimal, '2'],
+    [HandCoins, '3'],
+    [UsersRound, '4'],
+    [FileSpreadsheet, '5'],
+    [WifiOff, '6'],
+  ] as const;
+  return (
+    <section id="capabilities" className="scroll-mt-16 border-b border-border">
+      <div className="mx-auto max-w-6xl px-4 py-16">
+        <SectionHead eyebrow={t('landing.cap.eyebrow')} title={t('landing.cap.title')} />
+        <div className="mt-10 grid gap-x-10 gap-y-7 sm:grid-cols-2">
+          {caps.map(([Icon, n]) => (
+            <div key={n} className="flex gap-4">
+              <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg bg-brand-bg text-brand">
+                <Icon className="size-5" strokeWidth={2.1} />
+              </span>
+              <div>
+                <h3 className="font-bold">{t(`landing.cap.${n}.t` as 'landing.cap.1.t')}</h3>
+                <p className="mt-0.5 text-[15px] text-fg-muted">
+                  {t(`landing.cap.${n}.d` as 'landing.cap.1.d')}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* 3. A day at the service centre — three real tasks in order. */
 function Workflow({
   n,
   screen,
@@ -342,9 +413,12 @@ function Workflow({
     <section className={peach ? 'bg-brand-bg' : ''}>
       <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-14 md:grid-cols-2 md:py-20">
         <div className={flip ? 'md:order-2' : ''}>
-          <h2 className="text-3xl font-extrabold tracking-tight">
+          <p className="mb-2 text-sm font-bold text-brand">
+            {t(`landing.day.step${n}` as 'landing.day.step1')}
+          </p>
+          <h3 className="text-2xl font-extrabold tracking-tight">
             {tk(`landing.feat.${n}.title`)}
-          </h2>
+          </h3>
           <p className="mt-3 text-lg text-fg-muted">{tk(`landing.feat.${n}.body`)}</p>
           <p className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-brand">
             <Check className="size-4" />
@@ -357,11 +431,127 @@ function Workflow({
   );
 }
 
+function DayAtCentre() {
+  const { t } = useI18n();
+  return (
+    <div id="day" className="scroll-mt-16">
+      <section className="border-b border-border">
+        <div className="mx-auto max-w-6xl px-4 pt-16">
+          <SectionHead
+            eyebrow={t('landing.day.eyebrow')}
+            title={t('landing.day.title')}
+            sub={t('landing.day.sub')}
+            center
+          />
+        </div>
+      </section>
+      <Workflow n="1" screen={<RecordScreen />} />
+      <Workflow n="2" screen={<CashbookScreen />} peach flip />
+      <Workflow n="3" screen={<DuesScreen />} />
+    </div>
+  );
+}
+
+/* 4. Who it's for. */
+function WhoFor() {
+  const { t } = useI18n();
+  const who = [
+    [Landmark, '1'],
+    [FileSpreadsheet, '2'],
+    [Store, '3'],
+  ] as const;
+  return (
+    <section className="border-b border-border bg-brand-bg">
+      <div className="mx-auto max-w-6xl px-4 py-16">
+        <SectionHead title={t('landing.who.title')} sub={t('landing.who.sub')} center />
+        <div className="mt-10 grid gap-5 md:grid-cols-3">
+          {who.map(([Icon, n]) => (
+            <div key={n} className="rounded-xl border border-border bg-surface p-6">
+              <span className="grid size-10 place-items-center rounded-lg bg-brand-bg text-brand">
+                <Icon className="size-5" />
+              </span>
+              <h3 className="mt-4 font-bold">{t(`landing.who.${n}.t` as 'landing.who.1.t')}</h3>
+              <p className="mt-1.5 text-[15px] text-fg-muted">
+                {t(`landing.who.${n}.d` as 'landing.who.1.d')}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* 5. See the details — one screen with 2–3 annotations. */
+function Details() {
+  const { t } = useI18n();
+  const notes = ['1', '2', '3'] as const;
+  return (
+    <section className="border-b border-border">
+      <div className="mx-auto max-w-6xl px-4 py-16">
+        <SectionHead title={t('landing.details.title')} sub={t('landing.details.sub')} />
+        <div className="mt-10 grid items-center gap-10 lg:grid-cols-[1.1fr_1fr]">
+          <DashboardScreen />
+          <ol className="space-y-5">
+            {notes.map((n) => (
+              <li key={n} className="flex gap-4">
+                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-brand text-sm font-bold text-on-brand">
+                  {n}
+                </span>
+                <div>
+                  <h3 className="font-bold">
+                    {t(`landing.details.${n}.t` as 'landing.details.1.t')}
+                  </h3>
+                  <p className="mt-0.5 text-[15px] text-fg-muted">
+                    {t(`landing.details.${n}.d` as 'landing.details.1.d')}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* 6. Getting started — lightly tinted, the real steps after Create account. */
+function GettingStarted() {
+  const { t } = useI18n();
+  const steps = ['1', '2', '3', '4', '5'] as const;
+  return (
+    <section id="start" className="scroll-mt-16 border-b border-border bg-brand-bg">
+      <div className="mx-auto max-w-5xl px-4 py-16">
+        <SectionHead title={t('landing.start.title')} sub={t('landing.start.sub')} center />
+        <ol className="mx-auto mt-10 max-w-2xl space-y-3">
+          {steps.map((n) => (
+            <li
+              key={n}
+              className="flex items-center gap-4 rounded-xl border border-border bg-surface px-4 py-3"
+            >
+              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-brand font-bold text-on-brand">
+                {n}
+              </span>
+              <span className="font-semibold">{t(`landing.start.${n}` as 'landing.start.1')}</span>
+            </li>
+          ))}
+        </ol>
+        <div className="mt-8 text-center">
+          <Btn href="/register">
+            {t('landing.cta.create')}
+            <ArrowRight className="size-4" />
+          </Btn>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Faq() {
   const { t, tk } = useI18n();
   const qa = ['1', '2', '3', '4', '5', '6'] as const;
   return (
-    <section id="faq" className="border-t border-border">
+    <section id="faq" className="scroll-mt-16 border-b border-border">
       <div className="mx-auto max-w-3xl px-4 py-16">
         <h2 className="text-center text-3xl font-extrabold tracking-tight">
           {t('landing.faq.title')}
@@ -385,17 +575,17 @@ function Faq() {
 function CtaBand() {
   const { t } = useI18n();
   return (
-    <section id="pricing" className="border-t border-border bg-brand">
+    <section className="bg-brand">
       <div className="mx-auto max-w-4xl px-4 py-16 text-center text-on-brand">
         <h2 className="text-2xl font-extrabold tracking-tight sm:text-4xl">
           {t('landing.final.title')}
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-on-brand/85">{t('landing.pricing.sub')}</p>
         <Link
-          href="/login"
+          href="/register"
           className="mt-8 inline-flex min-h-12 items-center gap-2 rounded-lg bg-surface px-6 text-base font-bold text-fg transition hover:bg-surface-muted"
         >
-          {t('landing.cta.start')}
+          {t('landing.cta.create')}
           <ArrowRight className="size-5" />
         </Link>
       </div>
@@ -407,21 +597,21 @@ function Footer() {
   const { t } = useI18n();
   const brand = useBrand();
   return (
-    <footer className="border-t border-border bg-surface">
+    <footer className="bg-surface">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-10 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <BrandMark />
           <p className="mt-2 max-w-xs text-sm text-fg-muted">{t('landing.footer.tagline')}</p>
         </div>
         <nav className="flex flex-wrap gap-5 text-sm font-semibold text-fg-muted">
+          <Link href="/login" className="hover:text-fg">
+            {t('landing.cta.signin')}
+          </Link>
           <Link href="/terms" className="hover:text-fg">
             {t('auth.email.terms')}
           </Link>
           <Link href="/privacy" className="hover:text-fg">
             {t('auth.email.privacy')}
-          </Link>
-          <Link href="/login" className="hover:text-fg">
-            {t('landing.cta.signin')}
           </Link>
         </nav>
       </div>
@@ -448,11 +638,11 @@ export function LandingContent() {
       <main id="main" className="flex-1">
         <Hero />
         <TrustStrip />
-        <div id="work">
-          <Workflow n="1" screen={<RecordScreen />} />
-          <Workflow n="2" screen={<CashbookScreen />} peach flip />
-          <Workflow n="3" screen={<DuesScreen />} />
-        </div>
+        <Capabilities />
+        <DayAtCentre />
+        <WhoFor />
+        <Details />
+        <GettingStarted />
         <Faq />
         <CtaBand />
       </main>
