@@ -514,4 +514,12 @@ export const hi: Record<TranslationKey, string> = {
   'domains.pending': 'DNS लंबित',
   'domains.failed': 'अभी नहीं मिला',
   'common.remove': 'हटाएँ',
+  'landing.stats.s1v': '10+',
+  'landing.stats.s1l': 'काउंटर सेवाएँ',
+  'landing.stats.s2v': '₹0',
+  'landing.stats.s2l': 'शुरू करने के लिए',
+  'landing.stats.s3v': '2',
+  'landing.stats.s3l': 'भाषाएँ: हिंदी और अंग्रेज़ी',
+  'landing.stats.s4v': '100%',
+  'landing.stats.s4l': 'ऑफ़लाइन चलता है',
 };

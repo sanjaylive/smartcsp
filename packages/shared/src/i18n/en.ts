@@ -527,6 +527,14 @@ export const en = {
   'domains.pending': 'Pending DNS',
   'domains.failed': 'Not found yet',
   'common.remove': 'Remove',
+  'landing.stats.s1v': '10+',
+  'landing.stats.s1l': 'Counter services',
+  'landing.stats.s2v': '₹0',
+  'landing.stats.s2l': 'To get started',
+  'landing.stats.s3v': '2',
+  'landing.stats.s3l': 'Languages: Hindi & English',
+  'landing.stats.s4v': '100%',
+  'landing.stats.s4l': 'Works offline',
 } as const;
 
 export type TranslationKey = keyof typeof en;

@@ -5,17 +5,12 @@ import {
   ArrowRight,
   ArrowDownLeft,
   ArrowUpRight,
-  BookOpenCheck,
+  BadgeCheck,
   CheckCircle2,
   ClipboardList,
-  FileSpreadsheet,
-  Fingerprint,
   HandCoins,
-  Lock,
   Plus,
-  ShieldCheck,
-  Sparkles,
-  UsersRound,
+  Star,
   WalletMinimal,
   WifiOff,
 } from 'lucide-react';
@@ -25,14 +20,13 @@ import { useBrand } from '@/lib/brand';
 import { ServiceIcon, useServiceLabel } from '@/components/service';
 import { LanguageToggle, ThemeToggle } from '@/components/toggles';
 
-/* Public wordmark, driven by the configured brand (name + optional logo). */
 function BrandMark() {
   const brand = useBrand();
   return (
-    <Link href="/" className="inline-flex items-center gap-2.5 rounded-lg font-display">
+    <Link href="/" className="inline-flex items-center gap-2.5">
       <span
         aria-hidden
-        className="grid size-9 place-items-center overflow-hidden rounded-xl bg-brand text-on-brand shadow-[0_6px_20px_-6px_var(--brand)]"
+        className="grid size-9 place-items-center overflow-hidden rounded-xl bg-brand text-on-brand"
       >
         {brand.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -55,7 +49,7 @@ function Header() {
     ['#faq', t('landing.nav.faq')],
   ] as const;
   return (
-    <header className="sticky top-0 z-40 border-b border-border/70 bg-bg/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-border bg-surface">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4">
         <BrandMark />
         <nav aria-label="Primary" className="hidden items-center gap-1 md:flex">
@@ -63,7 +57,7 @@ function Header() {
             <a
               key={href}
               href={href}
-              className="rounded-lg px-3 py-2 text-sm font-semibold text-fg-muted transition hover:bg-surface-muted hover:text-fg"
+              className="rounded-lg px-3 py-2 text-sm font-semibold text-fg-muted transition hover:text-fg"
             >
               {label}
             </a>
@@ -74,16 +68,15 @@ function Header() {
           <ThemeToggle />
           <Link
             href="/login"
-            className="ml-1 hidden rounded-[10px] px-3 py-2 text-sm font-semibold text-fg-muted transition hover:text-fg sm:inline-flex"
+            className="ml-1 hidden rounded-lg px-3 py-2 text-sm font-semibold text-fg-muted transition hover:text-fg sm:inline-flex"
           >
             {t('landing.cta.signin')}
           </Link>
           <Link
             href="/login"
-            className="inline-flex min-h-10 items-center gap-1.5 rounded-[10px] bg-brand px-3.5 text-sm font-semibold text-on-brand shadow-[0_8px_24px_-10px_var(--brand)] transition hover:brightness-110"
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-brand px-4 text-sm font-bold text-on-brand transition hover:brightness-95"
           >
             {t('landing.cta.start')}
-            <ArrowRight className="size-4" />
           </Link>
         </div>
       </div>
@@ -91,91 +84,65 @@ function Header() {
   );
 }
 
-/* Honest, representative preview of the product — not real shop data. */
-function ProductPreview() {
-  const { t, tk } = useI18n();
+/* An honest, representative preview of the mobile app in a phone frame (not real shop data). */
+function PhoneMock() {
+  const { t } = useI18n();
+  const brand = useBrand();
   const rows = [
-    {
-      icon: ArrowDownLeft,
-      k: 'landing.mock.aeps',
-      amt: '₹5,000',
-      ok: true,
-      accent: 'text-success',
-    },
-    { icon: ArrowUpRight, k: 'landing.mock.dmt', amt: '₹2,500', ok: true, accent: 'text-success' },
-    { icon: ClipboardList, k: 'landing.mock.pan', amt: '₹107', ok: false, accent: 'text-warning' },
+    { icon: ArrowDownLeft, k: 'landing.mock.aeps', amt: '₹5,000', ok: true },
+    { icon: ArrowUpRight, k: 'landing.mock.dmt', amt: '₹2,500', ok: true },
+    { icon: ClipboardList, k: 'landing.mock.pan', amt: '₹107', ok: false },
   ] as const;
   return (
-    <div className="relative">
-      <div className="card overflow-hidden rounded-[1.5rem] p-0 shadow-[0_24px_60px_-28px_rgba(22,26,46,0.3)]">
-        <div className="flex items-center justify-between border-b border-border bg-surface-muted/60 px-5 py-3">
-          <div className="flex items-center gap-2">
-            <span className="size-3 rounded-full bg-danger/70" />
-            <span className="size-3 rounded-full bg-warning/70" />
-            <span className="size-3 rounded-full bg-success/70" />
-          </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-success-bg px-2.5 py-1 text-xs font-semibold text-success">
-            <CheckCircle2 className="size-3.5" />
-            {t('landing.mock.synced')}
-          </span>
-        </div>
-        <div className="space-y-4 p-5">
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-fg-muted">
-                {t('landing.mock.today')}
-              </p>
-              <p className="font-display text-3xl font-extrabold tracking-tight">₹18,240</p>
-              <p className="text-xs text-fg-muted">{t('landing.mock.collections')}</p>
+    <div className="relative mx-auto w-[270px]">
+      <div className="rounded-[2.5rem] border-[10px] border-fg/90 bg-bg shadow-2xl dark:border-black">
+        <div className="overflow-hidden rounded-[1.8rem]">
+          {/* app header */}
+          <div className="bg-brand px-4 pb-5 pt-4 text-on-brand">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold">{brand.name}</span>
+              <span className="grid size-6 place-items-center rounded-full bg-on-brand/20 text-[11px] font-bold">
+                R
+              </span>
             </div>
-            <div className="flex gap-2">
-              <div className="rounded-xl border border-border bg-bg px-3 py-2 text-right">
-                <p className="text-[11px] text-fg-muted">{t('landing.mock.cashInHand')}</p>
-                <p className="money text-sm font-bold">₹7,650</p>
+            <p className="mt-3 text-xs text-on-brand/80">{t('landing.mock.collections')}</p>
+            <p className="text-2xl font-extrabold tracking-tight">₹18,240</p>
+            <div className="mt-3 flex gap-2">
+              <div className="flex-1 rounded-xl bg-on-brand/15 px-2.5 py-1.5">
+                <p className="text-[10px] text-on-brand/80">{t('landing.mock.cashInHand')}</p>
+                <p className="text-sm font-bold">₹7,650</p>
               </div>
-              <div className="rounded-xl border border-border bg-bg px-3 py-2 text-right">
-                <p className="text-[11px] text-fg-muted">{t('landing.mock.pendingDues')}</p>
-                <p className="money text-sm font-bold text-warning">₹430</p>
+              <div className="flex-1 rounded-xl bg-on-brand/15 px-2.5 py-1.5">
+                <p className="text-[10px] text-on-brand/80">{t('landing.mock.pendingDues')}</p>
+                <p className="text-sm font-bold">₹430</p>
               </div>
             </div>
           </div>
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
+          {/* list */}
+          <div className="space-y-2 bg-surface p-3">
+            <p className="px-1 text-[10px] font-semibold uppercase tracking-wide text-fg-muted">
               {t('landing.mock.recent')}
             </p>
-            <div className="space-y-2">
-              {rows.map((r) => (
-                <div
-                  key={r.k}
-                  className="flex items-center gap-3 rounded-xl border border-border bg-bg px-3 py-2.5"
-                >
-                  <span className="grid size-9 place-items-center rounded-lg bg-surface-muted">
-                    <r.icon className={`size-4 ${r.accent}`} />
-                  </span>
-                  <span className="flex-1 text-sm font-semibold">{tk(r.k)}</span>
-                  <span className="money text-sm font-bold">{r.amt}</span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                      r.ok ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'
-                    }`}
-                  >
-                    {t(r.ok ? 'landing.mock.success' : 'landing.mock.pending')}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {rows.map((r) => (
+              <div key={r.k} className="flex items-center gap-2.5 rounded-xl bg-bg px-2.5 py-2">
+                <span className="grid size-8 place-items-center rounded-lg bg-surface-muted">
+                  <r.icon className="size-4 text-fg-muted" />
+                </span>
+                <span className="flex-1 text-[13px] font-semibold">{t(r.k)}</span>
+                <span className="text-[13px] font-bold">{r.amt}</span>
+                <span
+                  className={`size-2 rounded-full ${r.ok ? 'bg-success' : 'bg-warning'}`}
+                  aria-hidden
+                />
+              </div>
+            ))}
           </div>
         </div>
       </div>
-      <div className="absolute -bottom-5 -left-5 hidden animate-float rounded-2xl border border-border bg-surface px-4 py-3 shadow-lg sm:block">
-        <div className="flex items-center gap-2">
-          <span className="grid size-8 place-items-center rounded-lg bg-brand-bg text-brand-strong">
-            <WifiOff className="size-4" />
-          </span>
-          <div className="leading-tight">
-            <p className="text-xs font-bold">{t('landing.hero.chip1')}</p>
-            <p className="text-[11px] text-fg-muted">{t('landing.mock.synced')}</p>
-          </div>
+      <div className="absolute -right-3 top-28 hidden rounded-xl border border-border bg-surface px-3 py-2 shadow-lg sm:block">
+        <div className="flex items-center gap-1.5 text-xs font-bold">
+          <WifiOff className="size-3.5 text-brand" />
+          {t('landing.hero.chip1')}
         </div>
       </div>
     </div>
@@ -184,53 +151,72 @@ function ProductPreview() {
 
 function Hero() {
   const { t } = useI18n();
-  const chips = [
-    [WifiOff, t('landing.hero.chip1')],
-    [BookOpenCheck, t('landing.hero.chip2')],
-    [ShieldCheck, t('landing.hero.chip3')],
-  ] as const;
   return (
-    <section className="relative overflow-hidden">
-      <div aria-hidden className="aurora" />
-      <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:py-24">
-        <div className="animate-rise">
-          <p className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-sm font-semibold text-brand-strong backdrop-blur">
-            <Sparkles className="size-4" aria-hidden />
+    <section className="border-b border-border bg-surface">
+      <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-14 lg:grid-cols-2 lg:py-20">
+        <div>
+          <p className="inline-flex items-center gap-2 rounded-full bg-brand-bg px-3 py-1 text-sm font-semibold text-brand-strong">
+            <BadgeCheck className="size-4" aria-hidden />
             {t('landing.hero.badge')}
           </p>
-          <h1 className="mt-5 font-display text-[2.6rem] font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
+          <h1 className="mt-4 text-4xl font-extrabold leading-[1.12] tracking-tight sm:text-5xl">
             {t('landing.hero.title')}{' '}
             <span className="text-brand">{t('landing.hero.titleEm')}</span>
           </h1>
-          <p className="mt-5 max-w-xl text-lg text-fg-muted">{t('landing.hero.sub')}</p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
+          <p className="mt-4 max-w-xl text-lg text-fg-muted">{t('landing.hero.sub')}</p>
+          <div className="mt-7 flex flex-wrap items-center gap-3">
             <Link
               href="/login"
-              className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-brand px-6 text-base font-semibold text-on-brand shadow-[0_14px_40px_-12px_var(--brand)] transition hover:brightness-110"
+              className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-brand px-6 text-base font-bold text-on-brand transition hover:brightness-95"
             >
               {t('landing.cta.start')}
               <ArrowRight className="size-5" />
             </Link>
             <a
-              href="#pricing"
-              className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-border bg-surface px-6 text-base font-semibold text-fg transition hover:bg-surface-muted"
+              href="#features"
+              className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-border px-6 text-base font-bold text-fg transition hover:bg-surface-muted"
             >
-              {t('landing.cta.seePricing')}
+              {t('landing.nav.features')}
             </a>
           </div>
-          <p className="mt-4 text-sm text-fg-muted">{t('landing.hero.note')}</p>
-          <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2">
-            {chips.map(([Icon, label]) => (
-              <span key={label} className="inline-flex items-center gap-2 text-sm font-semibold">
-                <Icon className="size-4 text-brand" aria-hidden />
-                {label}
-              </span>
-            ))}
+          <p className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-fg-muted">
+            <CheckCircle2 className="size-4 text-success" aria-hidden />
+            {t('landing.hero.chip1')}
+            <span aria-hidden className="text-border">
+              ·
+            </span>
+            {t('landing.hero.chip2')}
+            <span aria-hidden className="text-border">
+              ·
+            </span>
+            {t('landing.hero.note')}
+          </p>
+        </div>
+        <div className="py-4">
+          <PhoneMock />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Stats() {
+  const { t } = useI18n();
+  const stats = [
+    ['landing.stats.s1v', 'landing.stats.s1l'],
+    ['landing.stats.s2v', 'landing.stats.s2l'],
+    ['landing.stats.s3v', 'landing.stats.s3l'],
+    ['landing.stats.s4v', 'landing.stats.s4l'],
+  ] as const;
+  return (
+    <section className="border-b border-border bg-bg">
+      <div className="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-4 py-10 md:grid-cols-4">
+        {stats.map(([v, l]) => (
+          <div key={v} className="text-center">
+            <p className="text-3xl font-extrabold tracking-tight text-brand">{t(v)}</p>
+            <p className="mt-1 text-sm font-semibold text-fg-muted">{t(l)}</p>
           </div>
-        </div>
-        <div className="animate-rise [animation-delay:120ms]">
-          <ProductPreview />
-        </div>
+        ))}
       </div>
     </section>
   );
@@ -240,53 +226,18 @@ function Services() {
   const { t } = useI18n();
   const label = useServiceLabel();
   return (
-    <section id="services" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-16">
-      <SectionHead title={t('landing.services.title')} sub={t('landing.services.sub')} />
-      <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {SERVICE_CODES.filter((c) => c !== 'CUSTOM').map((code) => (
-          <div
-            key={code}
-            className="group flex flex-col items-start gap-3 rounded-2xl border border-border bg-surface p-4 transition hover:-translate-y-0.5 hover:shadow-card"
-          >
-            <ServiceIcon code={code} />
-            <span className="text-sm font-semibold leading-snug">{label(code)}</span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function Features() {
-  const { t, tk } = useI18n();
-  const items = [
-    [ClipboardList, '1'],
-    [WalletMinimal, '2'],
-    [HandCoins, '3'],
-    [UsersRound, '4'],
-    [FileSpreadsheet, '5'],
-    [WifiOff, '6'],
-  ] as const;
-  return (
-    <section id="features" className="scroll-mt-20 border-y border-border bg-surface/40">
-      <div className="mx-auto max-w-6xl px-4 py-16 lg:py-20">
-        <SectionHead title={t('landing.feat.title')} sub={t('landing.feat.sub')} />
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map(([Icon, n]) => (
-            <article
-              key={n}
-              className="group relative overflow-hidden rounded-2xl border border-border bg-surface p-6 transition hover:shadow-card"
+    <section id="services" className="scroll-mt-20 border-b border-border bg-surface">
+      <div className="mx-auto max-w-6xl px-4 py-14">
+        <SectionHead title={t('landing.services.title')} sub={t('landing.services.sub')} center />
+        <div className="mx-auto mt-10 grid max-w-4xl grid-cols-3 gap-3 sm:grid-cols-5">
+          {SERVICE_CODES.filter((c) => c !== 'CUSTOM').map((code) => (
+            <div
+              key={code}
+              className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-bg px-2 py-4 text-center"
             >
-              <span className="grid size-11 place-items-center rounded-xl bg-brand-bg text-brand-strong">
-                <Icon className="size-5.5" strokeWidth={2.1} />
-              </span>
-              <h3 className="mt-4 font-display text-lg font-bold">
-                {tk(`landing.feat.${n}.title`)}
-              </h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">
-                {tk(`landing.feat.${n}.body`)}
-              </p>
-            </article>
+              <ServiceIcon code={code} />
+              <span className="text-[13px] font-semibold leading-snug">{label(code)}</span>
+            </div>
           ))}
         </div>
       </div>
@@ -294,60 +245,174 @@ function Features() {
   );
 }
 
-function HowItWorks() {
+/* Alternating feature rows, each with a small honest UI illustration. */
+function Features() {
   const { t, tk } = useI18n();
-  const steps = ['1', '2', '3'] as const;
+  const rows = [
+    { n: '1', visual: <RecordVisual /> },
+    { n: '2', visual: <CashbookVisual /> },
+    { n: '3', visual: <DuesVisual /> },
+    { n: '6', visual: <OfflineVisual /> },
+  ] as const;
   return (
-    <section className="mx-auto max-w-6xl px-4 py-16">
-      <SectionHead title={t('landing.how.title')} />
-      <ol className="mt-10 grid gap-6 md:grid-cols-3">
-        {steps.map((n, i) => (
-          <li key={n} className="relative">
-            <div className="flex items-center gap-3">
-              <span className="grid size-10 place-items-center rounded-full bg-brand font-display text-lg font-extrabold text-on-brand">
-                {n}
-              </span>
-              {i < steps.length - 1 && (
-                <span aria-hidden className="hidden h-px flex-1 bg-border md:block" />
-              )}
+    <section id="features" className="scroll-mt-20 bg-bg">
+      <div className="mx-auto max-w-6xl px-4 py-16">
+        <SectionHead title={t('landing.feat.title')} sub={t('landing.feat.sub')} center />
+        <div className="mt-14 flex flex-col gap-16">
+          {rows.map((r, i) => (
+            <div key={r.n} className="grid items-center gap-8 md:grid-cols-2">
+              <div className={i % 2 ? 'md:order-2' : ''}>
+                <h3 className="text-2xl font-extrabold tracking-tight">
+                  {tk(`landing.feat.${r.n}.title`)}
+                </h3>
+                <p className="mt-3 text-lg text-fg-muted">{tk(`landing.feat.${r.n}.body`)}</p>
+              </div>
+              <div className={i % 2 ? 'md:order-1' : ''}>{r.visual}</div>
             </div>
-            <h3 className="mt-4 font-display text-xl font-bold">{tk(`landing.how.${n}.t`)}</h3>
-            <p className="mt-1.5 text-fg-muted">{tk(`landing.how.${n}.d`)}</p>
-          </li>
-        ))}
-      </ol>
+          ))}
+        </div>
+      </div>
     </section>
+  );
+}
+
+function VisualFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-3xl border border-border bg-surface p-5 shadow-[0_18px_50px_-30px_rgba(22,26,46,0.4)]">
+      {children}
+    </div>
+  );
+}
+
+function RecordVisual() {
+  const { t } = useI18n();
+  return (
+    <VisualFrame>
+      <div className="flex items-center gap-3 border-b border-border pb-3">
+        <span className="grid size-9 place-items-center rounded-xl bg-brand-bg text-brand-strong">
+          <ClipboardList className="size-5" />
+        </span>
+        <span className="font-bold">{t('landing.mock.aeps')}</span>
+      </div>
+      <div className="mt-3 space-y-2">
+        {['₹5,000', '9876543210', '1234'].map((v, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-between rounded-lg bg-bg px-3 py-2 text-sm"
+          >
+            <span className="text-fg-muted">—</span>
+            <span className="font-semibold">{v}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 h-10 rounded-lg bg-brand" />
+    </VisualFrame>
+  );
+}
+
+function CashbookVisual() {
+  const { t } = useI18n();
+  const lines = [
+    { k: 'landing.mock.aeps', v: '+ ₹5,000', up: true },
+    { k: 'landing.mock.dmt', v: '− ₹2,500', up: false },
+  ] as const;
+  return (
+    <VisualFrame>
+      <div className="flex items-end justify-between border-b border-border pb-3">
+        <div>
+          <p className="text-xs text-fg-muted">{t('landing.mock.cashInHand')}</p>
+          <p className="text-2xl font-extrabold">₹7,650</p>
+        </div>
+        <HandCoins className="size-6 text-brand" />
+      </div>
+      <div className="mt-3 space-y-2">
+        {lines.map((l) => (
+          <div
+            key={l.k}
+            className="flex items-center justify-between rounded-lg bg-bg px-3 py-2 text-sm"
+          >
+            <span className="font-semibold">{t(l.k)}</span>
+            <span className={`font-bold ${l.up ? 'text-success' : 'text-danger'}`}>{l.v}</span>
+          </div>
+        ))}
+      </div>
+    </VisualFrame>
+  );
+}
+
+function DuesVisual() {
+  const { t } = useI18n();
+  return (
+    <VisualFrame>
+      <div className="flex items-center gap-3">
+        <span className="grid size-10 place-items-center rounded-full bg-brand-alt/20 font-bold text-brand-alt">
+          G
+        </span>
+        <div className="flex-1">
+          <p className="font-bold">Geeta</p>
+          <p className="text-xs text-fg-muted">{t('landing.mock.pendingDues')}</p>
+        </div>
+        <p className="font-extrabold text-warning">₹430</p>
+      </div>
+      <div className="mt-4 flex gap-2">
+        <div className="h-9 flex-1 rounded-lg bg-brand" />
+        <div className="h-9 w-20 rounded-lg border border-border" />
+      </div>
+    </VisualFrame>
+  );
+}
+
+function OfflineVisual() {
+  const { t } = useI18n();
+  return (
+    <VisualFrame>
+      <div className="flex items-center justify-center gap-3 py-6">
+        <span className="grid size-14 place-items-center rounded-2xl bg-brand-bg text-brand-strong">
+          <WifiOff className="size-7" />
+        </span>
+        <ArrowRight className="size-6 text-fg-muted" />
+        <span className="grid size-14 place-items-center rounded-2xl bg-success-bg text-success">
+          <CheckCircle2 className="size-7" />
+        </span>
+      </div>
+      <p className="text-center text-sm font-semibold text-fg-muted">{t('landing.mock.synced')}</p>
+    </VisualFrame>
   );
 }
 
 function Pricing() {
   const { t } = useI18n();
-  const free = {
-    name: t('landing.pricing.free.name'),
-    price: t('landing.pricing.free.price'),
-    per: t('landing.pricing.free.per'),
-    desc: t('landing.pricing.free.desc'),
-    feats: ['landing.pricing.free.f1', 'landing.pricing.free.f2', 'landing.pricing.free.f3'],
-  };
-  const growth = {
-    name: t('landing.pricing.growth.name'),
-    price: t('landing.pricing.growth.price'),
-    per: t('landing.pricing.growth.per'),
-    desc: t('landing.pricing.growth.desc'),
-    feats: [
-      'landing.pricing.growth.f1',
-      'landing.pricing.growth.f2',
-      'landing.pricing.growth.f3',
-      'landing.pricing.free.f1',
-    ],
-  };
   return (
-    <section id="pricing" className="scroll-mt-20 border-y border-border bg-surface/40">
-      <div className="mx-auto max-w-5xl px-4 py-16 lg:py-20">
-        <SectionHead title={t('landing.pricing.title')} sub={t('landing.pricing.sub')} />
+    <section id="pricing" className="scroll-mt-20 border-y border-border bg-surface">
+      <div className="mx-auto max-w-5xl px-4 py-16">
+        <SectionHead title={t('landing.pricing.title')} sub={t('landing.pricing.sub')} center />
         <div className="mt-10 grid gap-5 md:grid-cols-2">
-          <PlanCard plan={free} cta={t('landing.cta.startFree')} />
-          <PlanCard plan={growth} cta={t('landing.cta.start')} featured />
+          <PlanCard
+            name={t('landing.pricing.free.name')}
+            price={t('landing.pricing.free.price')}
+            per={t('landing.pricing.free.per')}
+            desc={t('landing.pricing.free.desc')}
+            feats={[
+              'landing.pricing.free.f1',
+              'landing.pricing.free.f2',
+              'landing.pricing.free.f3',
+            ]}
+            cta={t('landing.cta.startFree')}
+          />
+          <PlanCard
+            name={t('landing.pricing.growth.name')}
+            price={t('landing.pricing.growth.price')}
+            per={t('landing.pricing.growth.per')}
+            desc={t('landing.pricing.growth.desc')}
+            feats={[
+              'landing.pricing.growth.f1',
+              'landing.pricing.growth.f2',
+              'landing.pricing.growth.f3',
+              'landing.pricing.free.f1',
+            ]}
+            cta={t('landing.cta.start')}
+            featured
+          />
         </div>
         <p className="mt-6 text-center text-sm text-fg-muted">{t('landing.pricing.note')}</p>
       </div>
@@ -355,38 +420,44 @@ function Pricing() {
   );
 }
 
-// uses tk() for dynamic feature keys
 function PlanCard({
-  plan,
+  name,
+  price,
+  per,
+  desc,
+  feats,
   cta,
   featured,
 }: {
-  plan: { name: string; price: string; per: string; desc: string; feats: string[] };
+  name: string;
+  price: string;
+  per: string;
+  desc: string;
+  feats: string[];
   cta: string;
   featured?: boolean;
 }) {
   const { t, tk } = useI18n();
   return (
     <div
-      className={`relative flex flex-col rounded-2xl border p-7 ${
-        featured
-          ? 'border-brand bg-surface shadow-[0_20px_60px_-24px_var(--brand)]'
-          : 'border-border bg-surface'
+      className={`relative flex flex-col rounded-2xl border bg-surface p-7 ${
+        featured ? 'border-brand ring-1 ring-brand' : 'border-border'
       }`}
     >
       {featured && (
-        <span className="absolute -top-3 right-6 rounded-full bg-brand px-3 py-1 text-xs font-bold text-on-brand">
+        <span className="absolute -top-3 right-6 inline-flex items-center gap-1 rounded-full bg-brand px-3 py-1 text-xs font-bold text-on-brand">
+          <Star className="size-3" />
           {t('landing.pricing.popular')}
         </span>
       )}
-      <h3 className="font-display text-xl font-bold">{plan.name}</h3>
+      <h3 className="text-xl font-extrabold">{name}</h3>
       <div className="mt-2 flex items-baseline gap-1.5">
-        <span className="font-display text-4xl font-extrabold tracking-tight">{plan.price}</span>
-        <span className="text-sm text-fg-muted">{plan.per}</span>
+        <span className="text-4xl font-extrabold tracking-tight">{price}</span>
+        <span className="text-sm text-fg-muted">{per}</span>
       </div>
-      <p className="mt-2 text-sm text-fg-muted">{plan.desc}</p>
+      <p className="mt-2 text-sm text-fg-muted">{desc}</p>
       <ul className="mt-5 flex-1 space-y-2.5">
-        {plan.feats.map((f) => (
+        {feats.map((f) => (
           <li key={f} className="flex items-start gap-2.5 text-sm">
             <CheckCircle2 className="mt-0.5 size-4.5 shrink-0 text-success" aria-hidden />
             <span>{tk(f)}</span>
@@ -395,10 +466,10 @@ function PlanCard({
       </ul>
       <Link
         href="/login"
-        className={`mt-7 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold transition ${
+        className={`mt-7 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-bold transition ${
           featured
-            ? 'bg-brand text-on-brand hover:brightness-110'
-            : 'border border-border bg-surface hover:bg-surface-muted'
+            ? 'bg-brand text-on-brand hover:brightness-95'
+            : 'border border-border hover:bg-surface-muted'
         }`}
       >
         {cta}
@@ -408,46 +479,12 @@ function PlanCard({
   );
 }
 
-function Security() {
-  const { t } = useI18n();
-  const points = [
-    [Fingerprint, t('landing.security.p1')],
-    [Lock, t('landing.security.p2')],
-    [ShieldCheck, t('landing.security.p3')],
-  ] as const;
-  return (
-    <section className="mx-auto max-w-6xl px-4 py-16">
-      <div className="grid items-center gap-10 rounded-3xl border border-border bg-gradient-to-br from-surface to-brand-bg/40 p-8 lg:grid-cols-2 lg:p-12">
-        <div>
-          <h2 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
-            {t('landing.security.title')}
-          </h2>
-          <p className="mt-3 max-w-lg text-fg-muted">{t('landing.security.body')}</p>
-        </div>
-        <ul className="space-y-3">
-          {points.map(([Icon, label]) => (
-            <li
-              key={label}
-              className="flex items-center gap-3 rounded-xl border border-border bg-surface/80 px-4 py-3"
-            >
-              <span className="grid size-10 place-items-center rounded-lg bg-brand-bg text-brand-strong">
-                <Icon className="size-5" />
-              </span>
-              <span className="font-semibold">{label}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </section>
-  );
-}
-
 function Faq() {
   const { t, tk } = useI18n();
   const qa = ['1', '2', '3', '4', '5', '6'] as const;
   return (
     <section id="faq" className="mx-auto max-w-3xl scroll-mt-20 px-4 py-16">
-      <SectionHead title={t('landing.faq.title')} />
+      <SectionHead title={t('landing.faq.title')} center />
       <div className="mt-8 divide-y divide-border rounded-2xl border border-border bg-surface">
         {qa.map((n) => (
           <details key={n} className="group px-5">
@@ -466,22 +503,19 @@ function Faq() {
 function FinalCta() {
   const { t } = useI18n();
   return (
-    <section className="mx-auto max-w-6xl px-4 pb-16">
-      <div className="relative overflow-hidden rounded-3xl bg-brand px-6 py-14 text-center text-on-brand">
-        <div aria-hidden className="aurora aurora-on-brand" />
-        <h2 className="relative font-display text-2xl font-extrabold tracking-tight sm:text-4xl">
+    <section className="bg-brand">
+      <div className="mx-auto max-w-5xl px-4 py-16 text-center text-on-brand">
+        <h2 className="text-2xl font-extrabold tracking-tight sm:text-4xl">
           {t('landing.final.title')}
         </h2>
-        <p className="relative mx-auto mt-3 max-w-xl text-on-brand/85">{t('landing.final.sub')}</p>
-        <div className="relative mt-8 flex flex-wrap justify-center gap-3">
-          <Link
-            href="/login"
-            className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-surface px-6 text-base font-semibold text-fg shadow-lg transition hover:brightness-105"
-          >
-            {t('landing.cta.start')}
-            <ArrowRight className="size-5" />
-          </Link>
-        </div>
+        <p className="mx-auto mt-3 max-w-xl text-on-brand/85">{t('landing.final.sub')}</p>
+        <Link
+          href="/login"
+          className="mt-8 inline-flex min-h-12 items-center gap-2 rounded-xl bg-surface px-6 text-base font-bold text-fg transition hover:brightness-95"
+        >
+          {t('landing.cta.start')}
+          <ArrowRight className="size-5" />
+        </Link>
       </div>
     </section>
   );
@@ -490,6 +524,25 @@ function FinalCta() {
 function Footer() {
   const { t } = useI18n();
   const brand = useBrand();
+  const cols: Array<[string, Array<[string, string]>]> = [
+    [
+      t('landing.footer.product'),
+      [
+        ['#features', t('landing.nav.features')],
+        ['#services', t('landing.nav.services')],
+        ['#pricing', t('landing.nav.pricing')],
+        ['#faq', t('landing.nav.faq')],
+      ],
+    ],
+    [
+      t('landing.footer.legalH'),
+      [
+        ['/terms', t('auth.email.terms')],
+        ['/privacy', t('auth.email.privacy')],
+        ['/login', t('landing.cta.signin')],
+      ],
+    ],
+  ];
   return (
     <footer className="border-t border-border bg-surface">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:grid-cols-2 lg:grid-cols-4">
@@ -497,51 +550,20 @@ function Footer() {
           <BrandMark />
           <p className="mt-3 max-w-xs text-sm text-fg-muted">{t('landing.footer.tagline')}</p>
         </div>
-        <div>
-          <p className="text-sm font-bold">{t('landing.footer.product')}</p>
-          <ul className="mt-3 space-y-2 text-sm text-fg-muted">
-            <li>
-              <a href="#features" className="hover:text-fg">
-                {t('landing.nav.features')}
-              </a>
-            </li>
-            <li>
-              <a href="#services" className="hover:text-fg">
-                {t('landing.nav.services')}
-              </a>
-            </li>
-            <li>
-              <a href="#pricing" className="hover:text-fg">
-                {t('landing.nav.pricing')}
-              </a>
-            </li>
-            <li>
-              <a href="#faq" className="hover:text-fg">
-                {t('landing.nav.faq')}
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div>
-          <p className="text-sm font-bold">{t('landing.footer.legalH')}</p>
-          <ul className="mt-3 space-y-2 text-sm text-fg-muted">
-            <li>
-              <Link href="/terms" className="hover:text-fg">
-                {t('auth.email.terms')}
-              </Link>
-            </li>
-            <li>
-              <Link href="/privacy" className="hover:text-fg">
-                {t('auth.email.privacy')}
-              </Link>
-            </li>
-            <li>
-              <Link href="/login" className="hover:text-fg">
-                {t('landing.cta.signin')}
-              </Link>
-            </li>
-          </ul>
-        </div>
+        {cols.map(([head, links]) => (
+          <div key={head}>
+            <p className="text-sm font-bold">{head}</p>
+            <ul className="mt-3 space-y-2 text-sm text-fg-muted">
+              {links.map(([href, label]) => (
+                <li key={label}>
+                  <Link href={href} className="hover:text-fg">
+                    {label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
       <div className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-6 text-xs text-fg-muted sm:flex-row sm:items-center sm:justify-between">
@@ -555,10 +577,10 @@ function Footer() {
   );
 }
 
-function SectionHead({ title, sub }: { title: string; sub?: string }) {
+function SectionHead({ title, sub, center }: { title: string; sub?: string; center?: boolean }) {
   return (
-    <div className="max-w-2xl">
-      <h2 className="font-display text-2xl font-extrabold tracking-tight sm:text-4xl">{title}</h2>
+    <div className={center ? 'mx-auto max-w-2xl text-center' : 'max-w-2xl'}>
+      <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{title}</h2>
       {sub && <p className="mt-3 text-lg text-fg-muted">{sub}</p>}
     </div>
   );
@@ -567,18 +589,17 @@ function SectionHead({ title, sub }: { title: string; sub?: string }) {
 export function LandingContent() {
   const { t } = useI18n();
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex min-h-dvh flex-col bg-bg">
       <a href="#main" className="skip-link">
         {t('a11y.skip')}
       </a>
       <Header />
       <main id="main" className="flex-1">
         <Hero />
-        <Services />
+        <Stats />
         <Features />
-        <HowItWorks />
+        <Services />
         <Pricing />
-        <Security />
         <Faq />
         <FinalCta />
       </main>
