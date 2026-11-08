@@ -60,3 +60,11 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+# sqlite3 (pulled in only by the test-only sqflite_common_ffi) would otherwise download a prebuilt
+# library from GitHub releases on every fresh build; use the OS copy so tests/CI don't depend on that.
+hooks:
+  user_defines:
+    sqlite3:
+      source: system
+      name_linux: /usr/lib/x86_64-linux-gnu/libsqlite3.so.0
