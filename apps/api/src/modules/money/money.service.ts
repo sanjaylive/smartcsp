@@ -14,6 +14,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { Db, nextCounter, type TenantCtx } from '../../common/db';
 import { AppError, notFound } from '../../common/errors';
+import { MastersService } from '../masters/masters.service';
 import { AuditService } from '../../common/audit';
 import { big, d, n, toDate } from '../../common/serialize';
 import {
@@ -33,6 +34,7 @@ export class MoneyService {
     private readonly db: Db,
     private readonly ledger: LedgerService,
     private readonly audit: AuditService,
+    private readonly masters: MastersService,
   ) {}
 
   // ------------------------------------------------------------------ dues & collections
@@ -110,6 +112,12 @@ export class MoneyService {
         }
       }
       const total = dto.allocations.reduce((s, a) => s + big(a.amountPaise), 0n);
+      const paymentMode = await this.masters.resolvePaymentMode(
+        tx,
+        ctx,
+        dto.paymentMode,
+        dto.method,
+      );
       const id = randomUUID();
       const receiptNo = await nextCounter(tx, ctx.tenantId, 'receipt');
       const entry = await this.ledger.post(tx, ctx, {
@@ -131,6 +139,7 @@ export class MoneyService {
           receiptNo,
           customerId: dto.customerId ?? null,
           method: dto.method,
+          paymentMode,
           amountPaise: total,
           receivedOn: toDate(dto.receivedOn),
           notes: dto.notes ?? null,
@@ -275,6 +284,7 @@ export class MoneyService {
           receiptNo: c.receiptNo,
           customerId: c.customerId,
           method: c.method,
+          paymentMode: c.paymentMode,
           amountPaise: n(c.amountPaise),
           receivedOn: d(c.receivedOn),
           notes: c.notes,
@@ -293,6 +303,13 @@ export class MoneyService {
 
   async createExpense(ctx: TenantCtx, dto: z.infer<typeof expenseCreateSchema>) {
     return this.db.inTenant(ctx, async (tx) => {
+      await this.masters.assertExpenseCategory(tx, ctx, dto.category);
+      const paymentMode = await this.masters.resolvePaymentMode(
+        tx,
+        ctx,
+        dto.paymentMode,
+        dto.method,
+      );
       const id = randomUUID();
       const amount = big(dto.amountPaise);
       const entry = await this.ledger.post(tx, ctx, {
@@ -314,6 +331,7 @@ export class MoneyService {
           category: dto.category,
           amountPaise: amount,
           method: dto.method,
+          paymentMode,
           paidOn: toDate(dto.paidOn),
           vendor: dto.vendor ?? null,
           notes: dto.notes ?? null,
@@ -378,6 +396,7 @@ export class MoneyService {
     category: string;
     amountPaise: bigint;
     method: string;
+    paymentMode: string | null;
     paidOn: Date;
     vendor: string | null;
     notes: string | null;
@@ -390,6 +409,7 @@ export class MoneyService {
       category: e.category,
       amountPaise: n(e.amountPaise),
       method: e.method,
+      paymentMode: e.paymentMode,
       paidOn: d(e.paidOn),
       vendor: e.vendor,
       notes: e.notes,

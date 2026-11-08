@@ -12,6 +12,7 @@ import {
   Paperclip,
   Pencil,
   Plus,
+  ReceiptText,
   RotateCcw,
   Upload,
 } from 'lucide-react';
@@ -35,6 +36,7 @@ import {
   Alert,
   Badge,
   Button,
+  ButtonLink,
   Card,
   CardHeader,
   DescList,
@@ -177,20 +179,39 @@ function RecordView({ r, refetch }: { r: RecordDetail; refetch: () => void }) {
           </span>
         }
         actions={
-          can('records.edit') ? (
-            <Button
+          <>
+            <ButtonLink
+              href={`/app/records/${r.id}/receipt`}
               variant="outline"
-              icon={<Pencil aria-hidden className="size-4" />}
-              onClick={() => setEditOpen(true)}
+              icon={<ReceiptText aria-hidden className="size-4" />}
             >
-              {t('common.edit')}
-            </Button>
-          ) : null
+              Receipt
+            </ButtonLink>
+            {can('records.edit') ? (
+              <Button
+                variant="outline"
+                icon={<Pencil aria-hidden className="size-4" />}
+                onClick={() => setEditOpen(true)}
+              >
+                {t('common.edit')}
+              </Button>
+            ) : null}
+          </>
         }
       />
       <div className="flex flex-col gap-4">
         {sp.get('created') ? (
-          <Alert tone="success">
+          <Alert
+            tone="success"
+            action={
+              <ButtonLink
+                href={`/app/records/${r.id}/receipt`}
+                icon={<ReceiptText aria-hidden className="size-4" />}
+              >
+                Print / share receipt
+              </ButtonLink>
+            }
+          >
             <span data-testid="record-created">
               {t('recordDetail.created', { no: r.recordNo })}
             </span>
@@ -987,6 +1008,7 @@ function FollowUpsCard({ r }: { r: RecordDetail }) {
               <Input
                 id={p.id}
                 type="date"
+                required
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
               />

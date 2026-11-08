@@ -36,6 +36,7 @@ const NAV: { key: string; path: string; permission: Permission | null }[] = [
   { key: 'subscription', path: '/app/subscription', permission: 'subscription.view' },
   { key: 'shop', path: '/app/settings/shop', permission: 'settings.manage' },
   { key: 'services', path: '/app/settings/services', permission: 'services.manage' },
+  { key: 'masters', path: '/app/settings/masters', permission: 'settings.manage' },
   { key: 'integrations', path: '/app/integrations', permission: 'integrations.view' },
   { key: 'notifications', path: '/app/notifications', permission: null },
   { key: 'security', path: '/app/security', permission: null },

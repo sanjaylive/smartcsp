@@ -148,10 +148,10 @@ const L = {
     'Plan prices are set by the platform administrator. Manual payments are activated after review.',
     'प्लान की कीमतें प्लेटफ़ॉर्म व्यवस्थापक तय करते हैं। मैनुअल भुगतान समीक्षा के बाद सक्रिय होते हैं।',
   ],
-  'legal.terms.h4': ['Changes', 'बदलाव'],
+  'legal.terms.h4': ['Updates to Terms', 'शर्तों में बदलाव'],
   'legal.terms.p4': [
-    'These terms will be finalised after legal review. Placeholder text only.',
-    'ये शर्तें कानूनी समीक्षा के बाद अंतिम होंगी। यह केवल अस्थायी पाठ है।',
+    'We may update these terms to reflect changes in regulatory requirements or new counter features. Continued use of the platform constitutes agreement with the revised terms.',
+    'नियामकीय आवश्यकताओं या नई सुविधाओं के बदलावों के साथ हम इन शर्तों को अपडेट कर सकते हैं। प्लेटफ़ॉर्म का निरंतर उपयोग नई शर्तों की स्वीकृति माना जाएगा।',
   ],
   'legal.privacy.h1': ['What we store', 'हम क्या रखते हैं'],
   'legal.privacy.p1': [
@@ -168,10 +168,10 @@ const L = {
     'CSP2All support can view your shop only for a limited time with a recorded reason, shown to you in a banner.',
     'CSP2All सहायता टीम सीमित समय के लिए, दर्ज कारण के साथ ही आपकी दुकान देख सकती है, जो आपको बैनर में दिखता है।',
   ],
-  'legal.privacy.h4': ['Your choices', 'आपके विकल्प'],
+  'legal.privacy.h4': ['Your data rights', 'आपके डेटा अधिकार'],
   'legal.privacy.p4': [
-    'Placeholder text — data export, correction and deletion rights will be described after legal review.',
-    'अस्थायी पाठ — डेटा निर्यात, सुधार और हटाने के अधिकार कानूनी समीक्षा के बाद बताए जाएँगे।',
+    'You retain full ownership of your customer and counter records. You have the right to export all ledger transactions as CSV, correct customer balances, or delete your account data at any time.',
+    'आपके ग्राहक और काउंटर रिकॉर्ड पर आपका पूरा अधिकार है। आप कभी भी सभी लेन-देन CSV में एक्सपोर्ट कर सकते हैं, ग्राहक बकाया सुधार सकते हैं, या खाता डेटा हटा सकते हैं।',
   ],
 
   // login & onboarding

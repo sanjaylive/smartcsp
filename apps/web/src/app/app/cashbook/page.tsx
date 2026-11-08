@@ -106,6 +106,7 @@ function CashbookInner() {
             <Input
               id={p.id}
               type="date"
+              required
               value={date}
               max={today}
               onChange={(e) => setDate(e.target.value || today)}
@@ -453,6 +454,7 @@ function EntryDialog({
             <Input
               id={p.id}
               type="date"
+              required
               max={today}
               value={businessDate}
               onChange={(e) => setBusinessDate(e.target.value)}

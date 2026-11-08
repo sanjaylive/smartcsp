@@ -63,6 +63,7 @@ function ClosingInner() {
             <Input
               id={p.id}
               type="date"
+              required
               max={today}
               value={date}
               onChange={(e) => setDate(e.target.value || today)}

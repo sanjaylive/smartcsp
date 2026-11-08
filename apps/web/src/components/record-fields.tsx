@@ -163,6 +163,7 @@ export function DetailField({
               <Input
                 {...common}
                 type="date"
+                required={!!field.required}
                 value={str}
                 onChange={(e) => onChange(e.target.value)}
               />

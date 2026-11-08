@@ -131,20 +131,50 @@ export default function OnboardingPage() {
   return (
     <PublicShell wide>
       <div className="mx-auto max-w-3xl">
-        <p className="text-sm font-semibold text-brand">
-          {t('onboarding.step', { current: step === 'SHOP' ? 1 : 2, total: 2 })}
-        </p>
+        {/* Step indicator */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span>{t('onboarding.step', { current: step === 'SHOP' ? 1 : 2, total: 2 })}</span>
+            <span>
+              {step === 'SHOP' ? t('onboarding.shop.title') : t('onboarding.services.title')}
+            </span>
+          </div>
+          <div className="mt-2.5 grid grid-cols-2 gap-2">
+            <div
+              className={cn(
+                'h-1.5 rounded-full transition-all duration-300',
+                step === 'SHOP' ? 'bg-brand' : 'bg-emerald-500',
+              )}
+            />
+            <div
+              className={cn(
+                'h-1.5 rounded-full transition-all duration-300',
+                step === 'SERVICES' ? 'bg-brand' : 'bg-slate-200 dark:bg-slate-800',
+              )}
+            />
+          </div>
+        </div>
+
         <QueryState query={q}>
           {(data) =>
             step === 'SHOP' ? (
-              <form onSubmit={saveShop} noValidate className="card mt-3 flex flex-col gap-5 p-6">
-                <div className="flex items-center gap-3">
-                  <span className="flex size-11 items-center justify-center rounded-xl bg-brand-bg text-brand-strong dark:text-fg">
+              <form
+                onSubmit={saveShop}
+                noValidate
+                className="pro-card flex flex-col gap-6 p-6 sm:p-8"
+              >
+                <div className="flex items-center gap-3.5 border-b border-slate-200/60 pb-5 dark:border-slate-800/60">
+                  <span className="flex size-11 items-center justify-center rounded-2xl bg-brand-bg text-brand">
                     <Store aria-hidden className="size-5" />
                   </span>
-                  <h1 className="text-2xl font-extrabold tracking-tight">
-                    {t('onboarding.shop.title')}
-                  </h1>
+                  <div>
+                    <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+                      {t('onboarding.shop.title')}
+                    </h1>
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                      Configure your center details to personalize receipts and customer reports.
+                    </p>
+                  </div>
                 </div>
                 <div className="grid gap-5 sm:grid-cols-2">
                   <Field
@@ -179,7 +209,11 @@ export default function OnboardingPage() {
                       />
                     )}
                   </Field>
-                  <Field label={t('onboarding.shop.state')} required error={errs.get('state')}>
+                  <Field
+                    label={t('onboarding.shop.state')}
+                    optionalLabel={t('common.optional')}
+                    error={errs.get('state')}
+                  >
                     {(p) => (
                       <Select
                         id={p.id}
@@ -199,7 +233,7 @@ export default function OnboardingPage() {
                   </Field>
                   <Field
                     label={t('onboarding.shop.district')}
-                    required
+                    optionalLabel={t('common.optional')}
                     error={errs.get('district')}
                   >
                     {(p) => (
@@ -265,23 +299,25 @@ export default function OnboardingPage() {
                     )}
                   </Field>
                 </div>
-                <p className="text-sm text-fg-muted">{t('onboarding.timezoneNote')}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {t('onboarding.timezoneNote')}
+                </p>
                 {errs.formMessage && Object.keys(errs.fields).length === 0 ? (
                   <Alert tone="danger">{errs.formMessage}</Alert>
                 ) : null}
-                <div className="flex justify-end">
+                <div className="flex justify-end pt-2">
                   <Button type="submit" size="lg" loading={busy}>
                     {t('common.continue')}
                   </Button>
                 </div>
               </form>
             ) : (
-              <div className="mt-3 flex flex-col gap-5">
-                <div>
-                  <h1 className="text-2xl font-extrabold tracking-tight">
+              <div className="pro-card flex flex-col gap-6 p-6 sm:p-8">
+                <div className="border-b border-slate-200/60 pb-5 dark:border-slate-800/60">
+                  <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
                     {t('onboarding.services.title')}
                   </h1>
-                  <p className="mt-1 text-fg-muted">
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                     {data.startingPlan.enabledServiceLimit !== null
                       ? t('onboarding.limit', {
                           plan: data.startingPlan.name,
@@ -296,7 +332,10 @@ export default function OnboardingPage() {
                   </span>
                 </Alert>
                 <div className="flex items-center justify-between">
-                  <p className="font-semibold" aria-live="polite">
+                  <p
+                    className="text-sm font-semibold text-slate-900 dark:text-white"
+                    aria-live="polite"
+                  >
                     {t('onboarding.services.selected', { count: services.length })}
                     {data.startingPlan.enabledServiceLimit !== null
                       ? ` / ${data.startingPlan.enabledServiceLimit}`
@@ -325,28 +364,31 @@ export default function OnboardingPage() {
                           setServices((s) => (on ? s.filter((x) => x !== code) : [...s, code]))
                         }
                         className={cn(
-                          `accent-${def?.accent ?? 'slate'}`,
-                          'card flex min-h-24 items-start gap-3 p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-50',
-                          on ? 'border-2 border-[var(--acc-fg)] bg-acc-bg' : 'hover:border-brand',
+                          'relative flex min-h-24 items-start gap-3.5 rounded-2xl border p-4 text-left transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50',
+                          on
+                            ? 'border-brand bg-brand-bg shadow-sm ring-1 ring-brand/30'
+                            : 'border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-sm dark:border-slate-800/80 dark:bg-slate-900/60 dark:hover:border-slate-700',
                         )}
                       >
                         <ServiceIcon code={code} size="lg" />
                         <span className="min-w-0 flex-1">
-                          <span className="block font-bold">{label(code)}</span>
-                          <span className="mt-0.5 block text-sm text-fg-muted">
+                          <span className="block font-bold text-slate-900 dark:text-white">
+                            {label(code)}
+                          </span>
+                          <span className="mt-0.5 block text-xs leading-relaxed text-slate-500 dark:text-slate-400">
                             {tk(def?.descriptionKey ?? '')}
                           </span>
                         </span>
                         <span
                           aria-hidden
                           className={cn(
-                            'flex size-6 shrink-0 items-center justify-center rounded-md border-2',
+                            'flex size-5 shrink-0 items-center justify-center rounded-md border text-white transition-all',
                             on
-                              ? 'border-[var(--acc-fg)] bg-[var(--acc-fg)] text-white dark:text-bg'
-                              : 'border-border',
+                              ? 'border-brand bg-brand'
+                              : 'border-slate-300 bg-transparent dark:border-slate-700',
                           )}
                         >
-                          {on ? <Check className="size-4" /> : null}
+                          {on ? <Check className="size-3.5 stroke-[3]" /> : null}
                         </span>
                       </button>
                     );
@@ -360,7 +402,7 @@ export default function OnboardingPage() {
                 {errs.formMessage && !errs.get('services') ? (
                   <Alert tone="danger">{errs.formMessage}</Alert>
                 ) : null}
-                <div className="flex flex-wrap justify-between gap-3">
+                <div className="flex flex-wrap justify-between gap-3 border-t border-slate-200/60 pt-5 dark:border-slate-800/60">
                   <Button variant="outline" onClick={() => setStep('SHOP')} disabled={busy}>
                     {t('common.back')}
                   </Button>

@@ -253,6 +253,7 @@ function ReceiveDialog({ data, onClose }: { data: Commissions; onClose: () => vo
               <Input
                 id={p.id}
                 type="date"
+                required
                 max={today}
                 value={receivedOn}
                 onChange={(e) => setReceivedOn(e.target.value)}

@@ -9,9 +9,12 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import type { Customer, Prisma } from '@prisma/client';
+import { Prisma, type Beneficiary, type Customer } from '@prisma/client';
 import { z } from 'zod';
 import {
+  beneficiaryCreateSchema,
+  beneficiaryUpdateSchema,
+  customerKycSchema,
   customerCreateSchema,
   customerListQuery,
   customerUpdateSchema,
@@ -41,9 +44,31 @@ export function customerJson(ctx: TenantCtx, c: Customer) {
     phoneMasked: !sensitive && !!c.phone,
     notes: c.notes,
     followUpPreference: c.followUpPreference,
+    kyc: {
+      status: c.kycStatus,
+      idType: c.kycIdType,
+      // Even the last 4 characters are shown only to staff allowed to see contact details.
+      idLast4: sensitive ? c.kycIdLast4 : null,
+      remarks: sensitive ? c.kycRemarks : null,
+      verifiedAt: c.kycVerifiedAt,
+    },
     archivedAt: c.archivedAt,
     createdAt: c.createdAt,
     version: c.version,
+  };
+}
+
+function beneficiaryJson(b: Beneficiary) {
+  return {
+    id: b.id,
+    customerId: b.customerId,
+    name: b.name,
+    bankName: b.bankName,
+    accountLast4: b.accountLast4,
+    ifsc: b.ifsc,
+    active: b.active,
+    lastUsedAt: b.lastUsedAt,
+    version: b.version,
   };
 }
 
@@ -338,6 +363,184 @@ export class CustomersController {
       channel: cfg.otpChannel,
       messageId: res.messageId ?? res.requestId ?? null,
     };
+  }
+
+  // --------------------------------------------------------------------------- KYC
+
+  private async customerOr404(tx: Prisma.TransactionClient, ctx: TenantCtx, id: string) {
+    const c = await tx.customer.findFirst({ where: { id, tenantId: ctx.tenantId } });
+    if (!c) throw notFound('Customer');
+    return c;
+  }
+
+  @Get(':id/kyc')
+  @TenantAccess('customers.view', 'customers.view_sensitive')
+  @ApiDoc({ summary: 'KYC status, masked ID and uploaded ID documents', tags: ['Customers'] })
+  kyc(@Ctx() ctx: TenantCtx, @Param('id', ParseUUIDPipe) id: string) {
+    return this.db.inTenant(ctx, async (tx) => {
+      const c = await this.customerOr404(tx, ctx, id);
+      const docs = await tx.attachment.findMany({
+        where: { tenantId: ctx.tenantId, ownerType: 'CUSTOMER_KYC', ownerId: id, deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+      });
+      return {
+        ...customerJson(ctx, c).kyc,
+        version: c.version,
+        documents: docs.map((a) => ({
+          id: a.id,
+          fileName: a.fileName,
+          contentType: a.contentType,
+          sizeBytes: a.sizeBytes,
+          scanStatus: a.scanStatus,
+          createdAt: a.createdAt,
+        })),
+      };
+    });
+  }
+
+  @Patch(':id/kyc')
+  @TenantAccess('customers.manage', 'customers.view_sensitive')
+  @ApiDoc({
+    summary: 'Update KYC status and masked ID (version required)',
+    tags: ['Customers'],
+    body: customerKycSchema,
+  })
+  updateKyc(@Ctx() ctx: TenantCtx, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    const dto = parse(customerKycSchema, body);
+    return this.db.inTenant(ctx, async (tx) => {
+      const c = await this.customerOr404(tx, ctx, id);
+      const verifying = dto.status === 'VERIFIED' && c.kycStatus !== 'VERIFIED';
+      const res = await tx.customer.updateMany({
+        where: { id, tenantId: ctx.tenantId, version: dto.version },
+        data: {
+          kycStatus: dto.status,
+          kycIdType: dto.status === 'NONE' ? null : (dto.idType ?? null),
+          kycIdLast4: dto.status === 'NONE' ? null : (dto.idLast4 ?? null),
+          kycRemarks: dto.remarks ?? null,
+          kycVerifiedAt:
+            dto.status === 'VERIFIED' ? (verifying ? new Date() : c.kycVerifiedAt) : null,
+          kycVerifiedByUserId:
+            dto.status === 'VERIFIED' ? (verifying ? ctx.userId : c.kycVerifiedByUserId) : null,
+          version: { increment: 1 },
+        },
+      });
+      if (res.count !== 1) throw versionConflict();
+      await this.audit.tenant(tx, ctx, {
+        action: 'customer.kyc_updated',
+        targetType: 'customer',
+        targetId: id,
+        data: { status: dto.status, idType: dto.idType ?? null },
+      });
+      return customerJson(ctx, await tx.customer.findUniqueOrThrow({ where: { id } }));
+    });
+  }
+
+  // --------------------------------------------------------------------------- DMT beneficiaries
+
+  @Get(':id/beneficiaries')
+  @TenantAccess('customers.view')
+  @ApiDoc({ summary: 'Saved DMT beneficiaries of a customer', tags: ['Customers'] })
+  beneficiaries(@Ctx() ctx: TenantCtx, @Param('id', ParseUUIDPipe) id: string) {
+    return this.db.inTenant(ctx, async (tx) => {
+      await this.customerOr404(tx, ctx, id);
+      const items = await tx.beneficiary.findMany({
+        where: { tenantId: ctx.tenantId, customerId: id },
+        orderBy: [
+          { active: 'desc' },
+          { lastUsedAt: { sort: 'desc', nulls: 'last' } },
+          { createdAt: 'desc' },
+        ],
+      });
+      return { items: items.map(beneficiaryJson) };
+    });
+  }
+
+  @Post(':id/beneficiaries')
+  @TenantAccess('customers.manage')
+  @ApiDoc({
+    summary: 'Save a DMT beneficiary for a customer',
+    tags: ['Customers'],
+    body: beneficiaryCreateSchema,
+  })
+  addBeneficiary(
+    @Ctx() ctx: TenantCtx,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    const dto = parse(beneficiaryCreateSchema, body);
+    return this.db.inTenant(ctx, async (tx) => {
+      await this.customerOr404(tx, ctx, id);
+      const count = await tx.beneficiary.count({
+        where: { tenantId: ctx.tenantId, customerId: id },
+      });
+      if (count >= 50)
+        throw new AppError('QUOTA_EXCEEDED', 'A customer can have up to 50 saved beneficiaries');
+      const b = await tx.beneficiary
+        .create({
+          data: {
+            tenantId: ctx.tenantId,
+            customerId: id,
+            name: dto.name,
+            bankName: dto.bankName,
+            accountLast4: dto.accountLast4,
+            ifsc: dto.ifsc ?? null,
+            createdByUserId: ctx.userId,
+          },
+        })
+        .catch((e: unknown) => {
+          if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002')
+            throw new AppError('CONFLICT', 'This beneficiary is already saved', undefined, {
+              accountLast4: ['This beneficiary is already saved'],
+            });
+          throw e;
+        });
+      await this.audit.tenant(tx, ctx, {
+        action: 'beneficiary.created',
+        targetType: 'customer',
+        targetId: id,
+        data: { beneficiaryId: b.id },
+      });
+      return beneficiaryJson(b);
+    });
+  }
+
+  @Patch(':id/beneficiaries/:bid')
+  @TenantAccess('customers.manage')
+  @ApiDoc({
+    summary: 'Edit or turn off a saved beneficiary',
+    tags: ['Customers'],
+    body: beneficiaryUpdateSchema,
+  })
+  updateBeneficiary(
+    @Ctx() ctx: TenantCtx,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('bid', ParseUUIDPipe) bid: string,
+    @Body() body: unknown,
+  ) {
+    const dto = parse(beneficiaryUpdateSchema, body);
+    return this.db.inTenant(ctx, async (tx) => {
+      const res = await tx.beneficiary.updateMany({
+        where: { id: bid, customerId: id, tenantId: ctx.tenantId, version: dto.version },
+        data: {
+          name: dto.name,
+          bankName: dto.bankName,
+          accountLast4: dto.accountLast4,
+          ifsc: dto.ifsc,
+          active: dto.active,
+          version: { increment: 1 },
+        },
+      });
+      if (res.count !== 1) {
+        if (
+          !(await tx.beneficiary.findFirst({
+            where: { id: bid, customerId: id, tenantId: ctx.tenantId },
+          }))
+        )
+          throw notFound('Beneficiary');
+        throw versionConflict();
+      }
+      return beneficiaryJson(await tx.beneficiary.findUniqueOrThrow({ where: { id: bid } }));
+    });
   }
 }
 

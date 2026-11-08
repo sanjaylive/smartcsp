@@ -66,7 +66,7 @@ export default function SelectShop() {
                   type="button"
                   disabled={!!busy}
                   onClick={() => choose(m.tenantId)}
-                  className="card flex w-full items-center gap-4 p-4 text-left hover:border-brand disabled:opacity-60"
+                  className="pro-card flex w-full items-center gap-4 p-4 text-left disabled:opacity-60"
                 >
                   <span className="flex size-11 items-center justify-center rounded-xl bg-brand-bg text-brand-strong dark:text-fg">
                     <Store aria-hidden className="size-5" />

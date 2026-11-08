@@ -1,17 +1,14 @@
+import type { Metadata } from 'next';
 import { LegalPage } from '@/components/legal';
+import { PRIVACY } from '@/lib/legal-content';
 
-export const metadata = { title: 'Privacy Notice' };
+export const metadata: Metadata = {
+  title: 'Privacy Policy',
+  description: 'What data we collect, how we use and protect it, and your rights.',
+  robots: { index: true, follow: true },
+  alternates: { canonical: '/privacy' },
+};
 
-export default function Privacy() {
-  return (
-    <LegalPage
-      title="auth.email.privacy"
-      sections={[
-        { h: 'legal.privacy.h1', p: 'legal.privacy.p1' },
-        { h: 'legal.privacy.h2', p: 'legal.privacy.p2' },
-        { h: 'legal.privacy.h3', p: 'legal.privacy.p3' },
-        { h: 'legal.privacy.h4', p: 'legal.privacy.p4' },
-      ]}
-    />
-  );
+export default function Page() {
+  return <LegalPage doc={PRIVACY} />;
 }

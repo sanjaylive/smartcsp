@@ -32,6 +32,17 @@ const nextConfig: NextConfig = {
     // Same-origin proxy keeps the session cookie first-party and lets CSRF cookies be read.
     return [{ source: '/api/:path*', destination: `${API_URL}/:path*` }];
   },
+  async redirects() {
+    return [
+      { source: '/contact-us', destination: '/contact', permanent: true },
+      { source: '/about-us', destination: '/about', permanent: true },
+      { source: '/refund', destination: '/refund-policy', permanent: true },
+      { source: '/cancellation-policy', destination: '/refund-policy', permanent: true },
+      { source: '/shipping', destination: '/shipping-policy', permanent: true },
+      { source: '/terms-and-conditions', destination: '/terms', permanent: true },
+      { source: '/privacy-policy', destination: '/privacy', permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

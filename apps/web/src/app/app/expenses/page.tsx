@@ -35,7 +35,8 @@ import {
   Textarea,
   tableCls,
 } from '@/components/ui';
-import { Dialog } from '@/components/ui/dialog';
+import { Dialog, Drawer } from '@/components/ui/dialog';
+import { useMasters } from '@/lib/masters';
 import { QueryState } from '@/components/query-state';
 import { MoneyInput, rupeesOrZero } from '@/components/money-input';
 import { useToast } from '@/components/ui/toast';
@@ -71,12 +72,24 @@ export default function ExpensesPage() {
       <Card className="mb-4 flex flex-wrap items-end gap-4 p-4">
         <Field label={t('range.from')}>
           {(p) => (
-            <Input id={p.id} type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <Input
+              id={p.id}
+              type="date"
+              required
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+            />
           )}
         </Field>
         <Field label={t('range.to')}>
           {(p) => (
-            <Input id={p.id} type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            <Input
+              id={p.id}
+              type="date"
+              required
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+            />
           )}
         </Field>
       </Card>
@@ -119,7 +132,7 @@ export default function ExpensesPage() {
                             {formatDate(e.paidOn)}
                           </td>
                           <td className={tableCls.td}>
-                            {tk(`expenseCategory.${e.category}`)}
+                            {categoryLabel(tk, e.category)}
                             {e.reversedAt ? (
                               <Badge tone="warning" className="ml-2">
                                 {t('common.reversed')}
@@ -130,7 +143,9 @@ export default function ExpensesPage() {
                             ) : null}
                           </td>
                           <td className={tableCls.td}>{e.vendor ?? '—'}</td>
-                          <td className={tableCls.td}>{tk(`account.${e.method}`)}</td>
+                          <td className={tableCls.td}>
+                            {e.paymentMode ?? tk(`account.${e.method}`)}
+                          </td>
                           <td
                             className={cn(
                               tableCls.td,
@@ -175,9 +190,15 @@ function ExpenseDialog({ onClose }: { onClose: () => void }) {
   const today = useToday();
   const idem = useIdempotencyKey();
   const errs = useFormErrors();
-  const [category, setCategory] = useState<(typeof EXPENSE_CATEGORIES)[number]>('RENT');
+  const masters = useMasters();
+  const [category, setCategory] = useState<string>('RENT');
   const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState<(typeof FUND_ACCOUNTS)[number]>('CASH');
+  // "CASH" | "BANK" | "FLOAT" or "mode:<name>" for a shop-defined payment mode.
+  const [payWith, setPayWith] = useState<string>('CASH');
+  const customMode = payWith.startsWith('mode:')
+    ? masters.active('PAYMENT_MODE').find((x) => `mode:${x.name}` === payWith)
+    : undefined;
+  const method = (customMode?.data.account ?? payWith) as (typeof FUND_ACCOUNTS)[number];
   const [paidOn, setPaidOn] = useState(today);
   const [vendor, setVendor] = useState('');
   const [notes, setNotes] = useState('');
@@ -201,6 +222,7 @@ function ExpenseDialog({ onClose }: { onClose: () => void }) {
       category,
       amountPaise: paise,
       method,
+      paymentMode: customMode?.name ?? null,
       paidOn,
       vendor: vendor.trim() || null,
       notes: notes.trim() || null,
@@ -210,7 +232,7 @@ function ExpenseDialog({ onClose }: { onClose: () => void }) {
     m.mutate(body);
   };
   return (
-    <Dialog
+    <Drawer
       open
       onOpenChange={(o) => !o && onClose()}
       title={t('expense.new')}
@@ -225,19 +247,24 @@ function ExpenseDialog({ onClose }: { onClose: () => void }) {
         </>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t('expense.category')} required>
+      <div className="grid gap-4">
+        <Field label={t('expense.category')} required error={errs.get('category')}>
           {(p) => (
-            <Select
-              id={p.id}
-              value={category}
-              onChange={(e) => setCategory(e.target.value as typeof category)}
-            >
-              {EXPENSE_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {tk(`expenseCategory.${c}`)}
-                </option>
-              ))}
+            <Select id={p.id} value={category} onChange={(e) => setCategory(e.target.value)}>
+              <optgroup label="Built-in">
+                {EXPENSE_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {tk(`expenseCategory.${c}`)}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Your categories">
+                {masters.active('EXPENSE_CATEGORY').map((c) => (
+                  <option key={c.id} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
+              </optgroup>
             </Select>
           )}
         </Field>
@@ -254,14 +281,15 @@ function ExpenseDialog({ onClose }: { onClose: () => void }) {
         </Field>
         <Field label={t('expenses.paidFrom')}>
           {(p) => (
-            <Select
-              id={p.id}
-              value={method}
-              onChange={(e) => setMethod(e.target.value as typeof method)}
-            >
+            <Select id={p.id} value={payWith} onChange={(e) => setPayWith(e.target.value)}>
               {FUND_ACCOUNTS.map((a) => (
                 <option key={a} value={a}>
                   {tk(`account.${a}`)}
+                </option>
+              ))}
+              {masters.active('PAYMENT_MODE').map((x) => (
+                <option key={x.id} value={`mode:${x.name}`}>
+                  {x.name}
                 </option>
               ))}
             </Select>
@@ -272,6 +300,7 @@ function ExpenseDialog({ onClose }: { onClose: () => void }) {
             <Input
               id={p.id}
               type="date"
+              required
               max={today}
               value={paidOn}
               onChange={(e) => setPaidOn(e.target.value)}
@@ -308,7 +337,7 @@ function ExpenseDialog({ onClose }: { onClose: () => void }) {
           </Alert>
         ) : null}
       </div>
-    </Dialog>
+    </Drawer>
   );
 }
 
@@ -361,4 +390,9 @@ function ReverseExpense({ e, onClose }: { e: Expense; onClose: () => void }) {
       </Field>
     </Dialog>
   );
+}
+
+/** Built-in categories are translated; shop-defined ones are shown as typed. */
+function categoryLabel(tk: (k: string) => string, c: string) {
+  return (EXPENSE_CATEGORIES as readonly string[]).includes(c) ? tk(`expenseCategory.${c}`) : c;
 }

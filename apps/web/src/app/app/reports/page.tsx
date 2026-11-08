@@ -88,6 +88,7 @@ export default function ReportsPage() {
               <Input
                 id={p.id}
                 type="date"
+                required
                 value={from}
                 max={to}
                 onChange={(e) => setFrom(e.target.value)}
@@ -99,6 +100,7 @@ export default function ReportsPage() {
               <Input
                 id={p.id}
                 type="date"
+                required
                 value={to}
                 max={today}
                 onChange={(e) => setTo(e.target.value)}
@@ -395,6 +397,7 @@ function TrialTab() {
             <Input
               id={p.id}
               type="date"
+              required
               max={today}
               value={asOf}
               onChange={(e) => setAsOf(e.target.value)}
@@ -484,6 +487,7 @@ function DaybookTab() {
             <Input
               id={p.id}
               type="date"
+              required
               max={today}
               value={date}
               onChange={(e) => setDate(e.target.value)}
@@ -599,12 +603,24 @@ function ExportsTab() {
           </Field>
           <Field label={t('range.from')}>
             {(p) => (
-              <Input id={p.id} type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+              <Input
+                id={p.id}
+                type="date"
+                required
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+              />
             )}
           </Field>
           <Field label={t('range.to')}>
             {(p) => (
-              <Input id={p.id} type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+              <Input
+                id={p.id}
+                type="date"
+                required
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+              />
             )}
           </Field>
           <Button

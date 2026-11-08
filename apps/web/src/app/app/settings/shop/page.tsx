@@ -325,7 +325,11 @@ function ProfileForm({ p, reload }: { p: TenantProfile; reload: () => void }) {
               </Select>
             )}
           </Field>
-          <Field label={t('onboarding.shop.state')} required error={errs.get('state')}>
+          <Field
+            label={t('onboarding.shop.state')}
+            optionalLabel={t('common.optional')}
+            error={errs.get('state')}
+          >
             {(x) => (
               <Select id={x.id} value={f.state} onChange={(e) => set('state', e.target.value)}>
                 <option value="">{t('form.choose')}</option>
@@ -337,7 +341,11 @@ function ProfileForm({ p, reload }: { p: TenantProfile; reload: () => void }) {
               </Select>
             )}
           </Field>
-          <Field label={t('onboarding.shop.district')} required error={errs.get('district')}>
+          <Field
+            label={t('onboarding.shop.district')}
+            optionalLabel={t('common.optional')}
+            error={errs.get('district')}
+          >
             {(x) => (
               <Input
                 id={x.id}

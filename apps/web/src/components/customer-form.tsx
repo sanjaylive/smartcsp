@@ -9,8 +9,8 @@ import { useI18n } from '@/lib/i18n';
 import { useFormErrors, usePermissions, zodToFieldErrors } from '@/lib/hooks';
 import type { Customer } from '@/lib/types';
 import { Alert, Button, Field, Input, Select, Textarea } from './ui';
-import { Dialog } from './ui/dialog';
-import { useDebounced } from './customer-picker';
+import { Drawer } from './ui/dialog';
+import { useDebounced } from '@/lib/use-debounced';
 
 /** Create or edit a customer. Edit sends `version`; contact fields need `customers.view_sensitive`. */
 export function CustomerDialog({
@@ -18,16 +18,22 @@ export function CustomerDialog({
   onClose,
   onSaved,
   existing,
+  onUseExisting,
+  initialName = '',
 }: {
   open: boolean;
   onClose: () => void;
   onSaved: (c: Customer) => void;
   existing?: Customer | null;
+  /** When set, duplicate suggestions offer "Use this" instead of linking away. */
+  onUseExisting?: (c: Customer) => void;
+  /** Pre-fills the name (e.g. from what was typed in a search box). */
+  initialName?: string;
 }) {
   const { t, tk } = useI18n();
   const { can } = usePermissions();
   const canContact = !existing || can('customers.view_sensitive');
-  const [name, setName] = useState(existing?.name ?? '');
+  const [name, setName] = useState(existing?.name ?? initialName);
   const [phone, setPhone] = useState(existing && canContact ? (existing.phone ?? '') : '');
   const [email, setEmail] = useState(existing && canContact ? (existing.email ?? '') : '');
   const [notes, setNotes] = useState(existing?.notes ?? '');
@@ -71,7 +77,7 @@ export function CustomerDialog({
   };
 
   return (
-    <Dialog
+    <Drawer
       open={open}
       onOpenChange={(o) => !o && onClose()}
       title={existing ? t('customers.edit') : t('customer.new')}
@@ -100,7 +106,7 @@ export function CustomerDialog({
           )}
         </Field>
         {canContact ? (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4">
             <Field
               label={t('customer.phone')}
               optionalLabel={t('common.optional')}
@@ -171,14 +177,28 @@ export function CustomerDialog({
             <p className="text-sm">{t('customers.dupHelp')}</p>
             <ul className="mt-1 flex flex-col gap-1" data-testid="duplicate-suggestions">
               {dups.data.items.map((c) => (
-                <li key={c.id}>
-                  <Link
-                    href={`/app/customers/${c.id}`}
-                    className="font-semibold text-brand hover:underline"
-                  >
-                    {c.name}
-                  </Link>{' '}
+                <li key={c.id} className="flex flex-wrap items-center gap-2">
+                  {onUseExisting ? (
+                    <span className="font-semibold">{c.name}</span>
+                  ) : (
+                    <Link
+                      href={`/app/customers/${c.id}`}
+                      className="font-semibold text-brand hover:underline"
+                    >
+                      {c.name}
+                    </Link>
+                  )}
                   <span className="money text-sm text-fg-muted">{c.phone ?? ''}</span>
+                  {onUseExisting ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="ml-auto"
+                      onClick={() => onUseExisting(c)}
+                    >
+                      {t('customerPicker.useThis')}
+                    </Button>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -189,6 +209,6 @@ export function CustomerDialog({
           <Alert tone="danger">{errs.formMessage}</Alert>
         ) : null}
       </div>
-    </Dialog>
+    </Drawer>
   );
 }

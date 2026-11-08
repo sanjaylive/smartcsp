@@ -16,7 +16,7 @@ import { AppError, notFound } from '../../common/errors';
 import { hashIp } from '../../common/crypto';
 import { clientIp } from '../../common/security.guard';
 import { AuditService } from '../../common/audit';
-import { OtpService } from './otp.service';
+import { OtpService, normalizeEmail } from './otp.service';
 import { SessionService } from './session.service';
 import { MeService } from './me.service';
 import { Sms21Service } from '../messaging/sms21.service';
@@ -40,12 +40,24 @@ export class AuthController {
     summary: 'Request an email sign-in code',
     tags: ['Auth'],
     body: otpRequestSchema,
-    description:
-      'Always returns 202 with a challenge id; the response does not reveal whether an account exists.',
+    description: 'Always returns 202 with a challenge id and account existence indicator.',
   })
   async requestOtp(@Body() body: unknown, @Req() req: AppRequest) {
     const dto = parse(otpRequestSchema, body);
-    return this.otp.request(dto.email, 'LOGIN', hashIp(clientIp(req)));
+    const challenge = await this.otp.request(dto.email, 'LOGIN', hashIp(clientIp(req)));
+    const email = normalizeEmail(dto.email);
+    const user = await this.db.user.findFirst({
+      where: { email, status: 'ACTIVE' },
+      select: {
+        id: true,
+        memberships: {
+          where: { status: { in: ['ACTIVE', 'INVITED'] } },
+          select: { tenantId: true },
+        },
+      },
+    });
+    const exists = !!user && user.memberships.length > 0;
+    return { ...challenge, exists };
   }
 
   @Post('otp/verify')
@@ -86,10 +98,23 @@ export class AuthController {
       purpose: 'login',
       ip: clientIp(req),
     });
+    const mobile = `91${dto.phone}`;
+    const user = await this.db.user.findFirst({
+      where: { phone: mobile, status: 'ACTIVE' },
+      select: {
+        id: true,
+        memberships: {
+          where: { status: { in: ['ACTIVE', 'INVITED'] } },
+          select: { tenantId: true },
+        },
+      },
+    });
+    const exists = !!user && user.memberships.length > 0;
     return {
       challengeId: out.requestId,
       expiresInSeconds: out.expiresIn,
       resendAfterSeconds: out.resendAfter,
+      exists,
     };
   }
 

@@ -99,6 +99,7 @@ export const en = {
   'nav.subscription': 'Subscription',
   'nav.shop': 'Shop profile',
   'nav.services': 'Services',
+  'nav.masters': 'Masters',
   'nav.integrations': 'Integrations',
   'nav.notifications': 'Notifications',
   'nav.security': 'Security',

@@ -268,6 +268,7 @@ function CreateFollowUp({ onClose }: { onClose: () => void }) {
             <Input
               id={p.id}
               type="date"
+              required
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
             />

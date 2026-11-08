@@ -10,13 +10,16 @@ import type { ThemePref } from '@/lib/theme';
 import { getPublicConfig } from '@/lib/config';
 import './globals.css';
 
-export const metadata: Metadata = {
-  metadataBase: new URL('https://smart-outlet.in'),
-  title: { default: 'CSP2All', template: '%s · CSP2All' },
-  description: 'Records, cashbook and dues for your CSP shop',
-  // Default to noindex for the signed-in app; the public landing page opts back in per-route.
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { brand } = await getPublicConfig();
+  return {
+    metadataBase: new URL('https://smart-outlet.in'),
+    title: { default: brand.name, template: `%s · ${brand.name}` },
+    description: 'Records, cashbook and dues for your CSP shop',
+    // Default to noindex for the signed-in app; public pages opt back in per-route.
+    robots: { index: false, follow: false },
+  };
+}
 
 export const viewport: Viewport = {
   width: 'device-width',

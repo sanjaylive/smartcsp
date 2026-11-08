@@ -303,8 +303,8 @@
 }
 
 /*
- * Marketing homepage identity: warm off-white, charcoal text, brick red. Light only, scoped to the
- * landing subtree by redefining the colour tokens — so the app and admin keep their own theme.
+ * Marketing homepage identity: warm off-white, charcoal text, brick red (flat, Vyapar-style).
+ * Scoped to the landing subtree by redefining the colour tokens, so the app keeps its own theme.
  */
 .mk {
   --bg: #faf8f3;
@@ -315,16 +315,131 @@
   --border: #e8e0d5;
   --brand: #b53927;
   --brand-strong: #9a2f1e;
-  --brand-alt: #b53927;
+  --brand-alt: #d9622b;
   --brand-bg: #fbece5;
   --on-brand: #ffffff;
   --success: #2f7d53;
   --success-bg: #e4f0e8;
   --warning: #b2701a;
   --warning-bg: #f7ecd9;
+  --shadow-card: 0 1px 2px rgba(34, 32, 29, 0.05), 0 4px 14px -4px rgba(34, 32, 29, 0.08);
   color-scheme: light;
   background: var(--bg);
   color: var(--fg);
+}
+
+[data-theme='dark'] .mk {
+  --bg: #16130f;
+  --surface: #201c17;
+  --surface-muted: #2a251f;
+  --fg: #f5f0e8;
+  --fg-muted: #b3a998;
+  --border: #3a332a;
+  --brand: #e8674f;
+  --brand-strong: #f08a75;
+  --brand-alt: #f0894f;
+  --brand-bg: #3a1f19;
+  --on-brand: #16130f;
+  --success: #5fbf86;
+  --success-bg: #17301f;
+  --warning: #e0a548;
+  --warning-bg: #3a2b14;
+  --shadow-card: 0 4px 20px -4px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .mk {
+    --bg: #16130f;
+    --surface: #201c17;
+    --surface-muted: #2a251f;
+    --fg: #f5f0e8;
+    --fg-muted: #b3a998;
+    --border: #3a332a;
+    --brand: #e8674f;
+    --brand-strong: #f08a75;
+    --brand-alt: #f0894f;
+    --brand-bg: #3a1f19;
+    --on-brand: #16130f;
+    --success: #5fbf86;
+    --success-bg: #17301f;
+    --warning: #e0a548;
+    --warning-bg: #3a2b14;
+    --shadow-card: 0 4px 20px -4px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+    background: var(--bg);
+    color: var(--fg);
+  }
+}
+
+/* Ambient glow and pro SaaS utilities */
+.pro-radial-glow {
+  position: absolute;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 1200px;
+  height: 580px;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(
+    ellipse 75% 60% at 50% 10%,
+    color-mix(in srgb, var(--brand) 16%, transparent),
+    color-mix(in srgb, var(--brand-alt) 8%, transparent) 45%,
+    transparent 75%
+  );
+  filter: blur(48px);
+}
+
+.pro-window {
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--border) 60%, transparent),
+    0 24px 60px -15px rgba(15, 23, 42, 0.12),
+    0 10px 25px -8px rgba(34, 32, 29, 0.06);
+}
+
+[data-theme='dark'] .pro-window {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 24px 70px -15px rgba(0, 0, 0, 0.7);
+}
+
+.pro-glass {
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+}
+
+.pro-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 9999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--brand) 10%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--brand) 28%, transparent);
+  color: var(--brand);
+}
+
+.pro-card {
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pro-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--brand) 40%, var(--border));
+  box-shadow: 0 20px 40px -12px rgba(15, 23, 42, 0.09);
 }
 
 /* A single faint brand wash at the top of the hero — flat and clean, no multi-colour mesh. */
@@ -362,6 +477,7 @@
   opacity: 0.6;
 }
 
+/* ---------------------------------------------------------------- landing motion */
 @keyframes so-float {
   0%,
   100% {
@@ -381,16 +497,222 @@
     transform: translateY(0);
   }
 }
+@keyframes so-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.92);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes so-feed-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+    background: color-mix(in srgb, var(--brand) 12%, transparent);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    background: transparent;
+  }
+}
+@keyframes so-marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes so-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.2;
+  }
+}
+@keyframes so-bar {
+  0%,
+  100% {
+    transform: scaleY(0.45);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+@keyframes so-coin {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-46px);
+  }
+}
+@keyframes so-sway {
+  0%,
+  100% {
+    transform: rotate(-1.5deg);
+  }
+  50% {
+    transform: rotate(1.5deg);
+  }
+}
+@keyframes so-dots {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
 .animate-float {
   animation: so-float 5s ease-in-out infinite;
 }
 .animate-rise {
   animation: so-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+.animate-pop {
+  animation: so-pop 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-feed-in {
+  animation: so-feed-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Scroll reveal: elements start slightly low and fade up when they enter the viewport. */
+.reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+.marquee {
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: so-marquee 38s linear infinite;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+/* Illustration parts (inline SVG). */
+.art-blink {
+  animation: so-blink 1.4s ease-in-out infinite;
+}
+.art-bar {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: so-bar 2.4s ease-in-out infinite;
+}
+.art-coin {
+  transform-box: fill-box;
+  animation: so-coin 2.8s ease-out infinite;
+}
+.art-sway {
+  transform-box: fill-box;
+  transform-origin: top center;
+  animation: so-sway 4s ease-in-out infinite;
+}
+.typing-dot {
+  animation: so-dots 1.2s ease-in-out infinite;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .animate-float,
-  .animate-rise {
+  .animate-rise,
+  .animate-pop,
+  .animate-feed-in,
+  .marquee-track,
+  .art-blink,
+  .art-bar,
+  .art-coin,
+  .art-sway,
+  .typing-dot {
     animation: none;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* ---------------------------------------------------------------- drawer */
+@keyframes drawer-in-right {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes drawer-out-right {
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes drawer-in-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes drawer-out-up {
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+.drawer-overlay[data-state='open'] {
+  animation: fade-in 0.2s ease-out;
+}
+.drawer-overlay[data-state='closed'] {
+  animation: fade-out 0.18s ease-in;
+}
+.drawer-panel[data-state='open'] {
+  animation: drawer-in-up 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.drawer-panel[data-state='closed'] {
+  animation: drawer-out-up 0.2s ease-in;
+}
+@media (min-width: 640px) {
+  .drawer-panel[data-state='open'] {
+    animation-name: drawer-in-right;
+  }
+  .drawer-panel[data-state='closed'] {
+    animation-name: drawer-out-right;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawer-overlay,
+  .drawer-panel {
+    animation: none !important;
   }
 }

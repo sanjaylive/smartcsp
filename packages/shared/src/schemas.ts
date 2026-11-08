@@ -75,8 +75,9 @@ export const shopSetupSchema = z.object({
   shopName: safeText(80).pipe(z.string().min(2, 'Enter your shop name')),
   ownerName: safeText(80).pipe(z.string().min(2, 'Enter your name')),
   contactPhone: indianMobile.optional().nullable(),
-  state: z.string().trim().min(2).max(60),
-  district: z.string().trim().min(2).max(60),
+  // Optional: sign-up asks only for shop, owner and mobile; location can be added in settings.
+  state: z.string().trim().max(60).optional(),
+  district: z.string().trim().max(60).optional(),
   address: safeText(240).optional().nullable(),
   preferredLanguage: z.enum(LANGUAGES).default('en'),
   timezone: z.string().max(60).default('Asia/Kolkata'),
@@ -134,6 +135,10 @@ export const recordCreateBase = z.object({
   /** How the principal moved for PAYOUT/COLLECT services. */
   principalMethod: z.enum(['CASH', 'UPI', 'BANK']).default('CASH'),
   externalRef: z.string().trim().max(60).optional().nullable(),
+  /** Shop-defined payment mode label (e.g. "PhonePe"); must map to the same fund account. */
+  paymentMode: z.string().trim().max(40).optional().nullable(),
+  /** Shop-defined provider / portal the service was done on. */
+  provider: z.string().trim().max(60).optional().nullable(),
   assignedToUserId: uuid.optional().nullable(),
   notes: safeText(1000).optional().nullable(),
   followUpDate: isoDate.optional().nullable(),
@@ -167,6 +172,8 @@ export const recordUpdateSchema = z.object({
   amountCollectedPaise: paise.optional(),
   principalMethod: z.enum(['CASH', 'UPI', 'BANK']).optional(),
   externalRef: z.string().trim().max(60).optional().nullable(),
+  paymentMode: z.string().trim().max(40).optional().nullable(),
+  provider: z.string().trim().max(60).optional().nullable(),
   assignedToUserId: uuid.optional().nullable(),
   notes: safeText(1000).optional().nullable(),
   followUpDate: isoDate.optional().nullable(),
@@ -223,6 +230,7 @@ export const followUpUpdateSchema = z.object({
 export const collectionCreateSchema = z.object({
   customerId: uuid.optional().nullable(),
   method: z.enum(['CASH', 'UPI', 'BANK']),
+  paymentMode: z.string().trim().max(40).optional().nullable(),
   receivedOn: isoDate,
   notes: safeText(500).optional().nullable(),
   allocations: z
@@ -243,9 +251,11 @@ export const EXPENSE_CATEGORIES = [
   'OTHER',
 ] as const;
 export const expenseCreateSchema = z.object({
-  category: z.enum(EXPENSE_CATEGORIES),
+  /** A built-in EXPENSE_CATEGORIES code or the name of a shop-defined category. */
+  category: z.string().trim().min(1, 'Choose a category').max(40),
   amountPaise: positivePaise,
   method: z.enum(FUND_ACCOUNTS),
+  paymentMode: z.string().trim().max(40).optional().nullable(),
   paidOn: isoDate,
   vendor: safeText(80).optional().nullable(),
   notes: safeText(500).optional().nullable(),
@@ -439,3 +449,124 @@ export const adminUpdateSchema = z.object({
   status: z.enum(['ACTIVE', 'DISABLED']).optional(),
 });
 export const catalogUpdateSchema = z.object({ platformEnabled: z.boolean() });
+
+// ----------------------------------------------------------------------------- shop masters
+/** Lists each shop maintains for itself (Settings → Masters). */
+export const MASTER_KINDS = ['EXPENSE_CATEGORY', 'PAYMENT_MODE', 'PROVIDER', 'FEE_PRESET'] as const;
+export type MasterKind = (typeof MASTER_KINDS)[number];
+
+const masterName = safeText(40).pipe(z.string().min(2, 'Enter a name'));
+
+export const feeSlabSchema = z.object({
+  /** Upper bound of the transaction amount for this slab; null = no upper limit. */
+  upToPaise: positivePaise.nullable(),
+  feePaise: paise,
+});
+
+const feeSlabsSchema = z
+  .array(feeSlabSchema)
+  .min(1, 'Add at least one slab')
+  .max(12)
+  .refine(
+    (slabs) =>
+      slabs.every(
+        (s, i) =>
+          i === 0 ||
+          (slabs[i - 1]!.upToPaise !== null &&
+            (s.upToPaise === null || s.upToPaise > slabs[i - 1]!.upToPaise!)),
+      ),
+    'Slabs must go up in amount, and only the last one can have no upper limit',
+  );
+
+export const masterDataSchemas = {
+  EXPENSE_CATEGORY: z.object({}).default({}),
+  PAYMENT_MODE: z.object({ account: z.enum(FUND_ACCOUNTS) }),
+  PROVIDER: z
+    .object({ services: z.array(z.enum(SERVICE_CODES)).max(SERVICE_CODES.length).default([]) })
+    .default({ services: [] }),
+  FEE_PRESET: z.object({ serviceCode: z.enum(SERVICE_CODES), slabs: feeSlabsSchema }),
+} as const;
+
+export const masterCreateSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('EXPENSE_CATEGORY'),
+    name: masterName,
+    data: masterDataSchemas.EXPENSE_CATEGORY,
+  }),
+  z.object({
+    kind: z.literal('PAYMENT_MODE'),
+    name: masterName,
+    data: masterDataSchemas.PAYMENT_MODE,
+  }),
+  z.object({ kind: z.literal('PROVIDER'), name: masterName, data: masterDataSchemas.PROVIDER }),
+  z.object({ kind: z.literal('FEE_PRESET'), name: masterName, data: masterDataSchemas.FEE_PRESET }),
+]);
+
+export const masterUpdateSchema = z.object({
+  version: z.number().int(),
+  name: masterName.optional(),
+  active: z.boolean().optional(),
+  sortOrder: z.number().int().min(0).max(9999).optional(),
+  /** Validated against the master's kind on the server. */
+  data: z.record(z.string(), z.unknown()).optional(),
+});
+
+/** Picks the customer fee for an amount from a preset's slabs (first slab whose limit covers it). */
+export function feeFromSlabs(
+  slabs: Array<z.infer<typeof feeSlabSchema>>,
+  amountPaise: number,
+): number | null {
+  for (const s of slabs) if (s.upToPaise === null || amountPaise <= s.upToPaise) return s.feePaise;
+  return null;
+}
+
+// ----------------------------------------------------------------------------- customer KYC
+export const KYC_STATUSES = ['NONE', 'PENDING', 'VERIFIED', 'REJECTED'] as const;
+export type KycStatus = (typeof KYC_STATUSES)[number];
+export const KYC_ID_TYPES = [
+  'AADHAAR',
+  'PAN',
+  'VOTER_ID',
+  'DRIVING_LICENCE',
+  'PASSPORT',
+  'RATION_CARD',
+  'OTHER',
+] as const;
+export type KycIdType = (typeof KYC_ID_TYPES)[number];
+
+export const customerKycSchema = z
+  .object({
+    version: z.number().int(),
+    status: z.enum(KYC_STATUSES),
+    idType: z.enum(KYC_ID_TYPES).optional().nullable(),
+    /** Only the last 4 characters of the ID number are ever stored. */
+    idLast4: z
+      .string()
+      .trim()
+      .transform((v) => v.toUpperCase())
+      .pipe(z.string().regex(/^[A-Z0-9]{4}$/, 'Enter only the last 4 characters'))
+      .optional()
+      .nullable(),
+    remarks: safeText(300).optional().nullable(),
+  })
+  .refine((k) => k.status !== 'VERIFIED' || (!!k.idType && !!k.idLast4), {
+    message: 'Choose the ID type and enter its last 4 characters to mark KYC verified',
+    path: ['idLast4'],
+  });
+
+// ----------------------------------------------------------------------------- DMT beneficiaries
+const ifscCode = z
+  .string()
+  .trim()
+  .transform((v) => v.toUpperCase())
+  .pipe(z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'Invalid IFSC'));
+
+export const beneficiaryCreateSchema = z.object({
+  name: safeText(80).pipe(z.string().min(2, 'Enter the beneficiary name')),
+  bankName: safeText(80).pipe(z.string().min(2, 'Enter the bank name')),
+  accountLast4: z.string().regex(/^\d{4}$/, 'Enter only the last 4 digits'),
+  ifsc: ifscCode.optional().nullable(),
+});
+export const beneficiaryUpdateSchema = beneficiaryCreateSchema
+  .partial()
+  .extend({ version: z.number().int(), active: z.boolean().optional() });

@@ -29,6 +29,13 @@ describe('Email OTP', () => {
     const b = await requestOtp(uniqueEmail('new')).expect(202);
     expect(Object.keys(a.body).sort()).toEqual(Object.keys(b.body).sort());
     expect(a.body).not.toHaveProperty('code');
+    // Never reveal who owns an email address to an unauthenticated caller.
+    expect(a.body).not.toHaveProperty('name');
+    expect(b.body).not.toHaveProperty('name');
+  });
+
+  it('has no public account-lookup endpoint', async () => {
+    await t.http().post('/v1/auth/check').send({ email: 'x@example.test' }).expect(404);
   });
 
   it('stores only a keyed hash, never the code', async () => {

@@ -266,7 +266,7 @@
     "/v1/auth/otp/request": {
       "post": {
         "summary": "Request an email sign-in code",
-        "description": "Always returns 202 with a challenge id; the response does not reveal whether an account exists.",
+        "description": "Always returns 202 with a challenge id and account existence indicator.",
         "tags": [
           "Auth"
         ],
@@ -1113,12 +1113,10 @@
                   },
                   "state": {
                     "type": "string",
-                    "minLength": 2,
                     "maxLength": 60
                   },
                   "district": {
                     "type": "string",
-                    "minLength": 2,
                     "maxLength": 60
                   },
                   "address": {
@@ -1142,9 +1140,7 @@
                 },
                 "required": [
                   "shopName",
-                  "ownerName",
-                  "state",
-                  "district"
+                  "ownerName"
                 ]
               }
             }
@@ -1503,12 +1499,10 @@
                   },
                   "state": {
                     "type": "string",
-                    "minLength": 2,
                     "maxLength": 60
                   },
                   "district": {
                     "type": "string",
-                    "minLength": 2,
                     "maxLength": 60
                   },
                   "address": {
@@ -1973,6 +1967,128 @@
         ]
       }
     },
+    "/v1/records/{id}/receipt": {
+      "get": {
+        "summary": "Customer receipt for a record (for printing or sharing)",
+        "tags": [
+          "Records"
+        ],
+        "operationId": "Records_receipt",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "records.view"
+        ]
+      }
+    },
+    "/v1/records/{id}/receipt/send": {
+      "post": {
+        "summary": "Email the receipt, or send it on WhatsApp/SMS through the shop’s SMS21 connection",
+        "tags": [
+          "Records"
+        ],
+        "operationId": "Records_sendReceipt",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "records.view"
+        ]
+      }
+    },
     "/v1/records": {
       "get": {
         "summary": "List service records (own records only unless records.view_all)",
@@ -2311,6 +2427,16 @@
                     "type": "string",
                     "maxLength": 60
                   },
+                  "paymentMode": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "provider": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 60
+                  },
                   "assignedToUserId": {
                     "nullable": true,
                     "type": "string",
@@ -2523,6 +2649,16 @@
                     ]
                   },
                   "externalRef": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "paymentMode": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "provider": {
                     "nullable": true,
                     "type": "string",
                     "maxLength": 60
@@ -2751,6 +2887,16 @@
                     ]
                   },
                   "externalRef": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "paymentMode": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "provider": {
                     "nullable": true,
                     "type": "string",
                     "maxLength": 60
@@ -3622,6 +3768,441 @@
         ]
       }
     },
+    "/v1/customers/{id}/kyc": {
+      "get": {
+        "summary": "KYC status, masked ID and uploaded ID documents",
+        "tags": [
+          "Customers"
+        ],
+        "operationId": "Customers_kyc",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "customers.view",
+          "customers.view_sensitive"
+        ]
+      },
+      "patch": {
+        "summary": "Update KYC status and masked ID (version required)",
+        "tags": [
+          "Customers"
+        ],
+        "operationId": "Customers_updateKyc",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "NONE",
+                      "PENDING",
+                      "VERIFIED",
+                      "REJECTED"
+                    ]
+                  },
+                  "idType": {
+                    "nullable": true,
+                    "type": "string",
+                    "enum": [
+                      "AADHAAR",
+                      "PAN",
+                      "VOTER_ID",
+                      "DRIVING_LICENCE",
+                      "PASSPORT",
+                      "RATION_CARD",
+                      "OTHER"
+                    ]
+                  },
+                  "idLast4": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "remarks": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "version",
+                  "status"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "customers.manage",
+          "customers.view_sensitive"
+        ]
+      }
+    },
+    "/v1/customers/{id}/beneficiaries": {
+      "get": {
+        "summary": "Saved DMT beneficiaries of a customer",
+        "tags": [
+          "Customers"
+        ],
+        "operationId": "Customers_beneficiaries",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "customers.view"
+        ]
+      },
+      "post": {
+        "summary": "Save a DMT beneficiary for a customer",
+        "tags": [
+          "Customers"
+        ],
+        "operationId": "Customers_addBeneficiary",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "bankName": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "accountLast4": {
+                    "type": "string",
+                    "pattern": "^\\d{4}$"
+                  },
+                  "ifsc": {
+                    "nullable": true,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "bankName",
+                  "accountLast4"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "customers.manage"
+        ]
+      }
+    },
+    "/v1/customers/{id}/beneficiaries/{bid}": {
+      "patch": {
+        "summary": "Edit or turn off a saved beneficiary",
+        "tags": [
+          "Customers"
+        ],
+        "operationId": "Customers_updateBeneficiary",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "bankName": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "accountLast4": {
+                    "type": "string",
+                    "pattern": "^\\d{4}$"
+                  },
+                  "ifsc": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "active": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "version"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "customers.manage"
+        ]
+      }
+    },
     "/v1/follow-ups": {
       "get": {
         "summary": "List follow-up tasks",
@@ -4125,6 +4706,11 @@
                       "BANK"
                     ]
                   },
+                  "paymentMode": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 40
+                  },
                   "receivedOn": {
                     "type": "string"
                   },
@@ -4388,17 +4974,8 @@
                 "properties": {
                   "category": {
                     "type": "string",
-                    "enum": [
-                      "RENT",
-                      "ELECTRICITY",
-                      "INTERNET",
-                      "SALARY",
-                      "STATIONERY",
-                      "TRAVEL",
-                      "MAINTENANCE",
-                      "PROVIDER_CHARGES",
-                      "OTHER"
-                    ]
+                    "minLength": 1,
+                    "maxLength": 40
                   },
                   "amountPaise": {
                     "type": "integer",
@@ -4412,6 +4989,11 @@
                       "BANK",
                       "FLOAT"
                     ]
+                  },
+                  "paymentMode": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 40
                   },
                   "paidOn": {
                     "type": "string"
@@ -7722,6 +8304,16 @@
                     ]
                   },
                   "externalRef": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "paymentMode": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "provider": {
                     "nullable": true,
                     "type": "string",
                     "maxLength": 60
@@ -11219,6 +11811,392 @@
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "settings.manage"
+        ]
+      }
+    },
+    "/v1/masters": {
+      "get": {
+        "summary": "List the shop’s own expense categories, payment modes, providers and fee presets",
+        "tags": [
+          "Masters"
+        ],
+        "operationId": "Masters_list",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": []
+      },
+      "post": {
+        "summary": "Add an entry to one of the shop’s lists",
+        "tags": [
+          "Masters"
+        ],
+        "operationId": "Masters_create",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "EXPENSE_CATEGORY"
+                        ]
+                      },
+                      "name": {
+                        "type": "string",
+                        "maxLength": 40
+                      },
+                      "data": {
+                        "default": {},
+                        "type": "object",
+                        "properties": {}
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "name"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "PAYMENT_MODE"
+                        ]
+                      },
+                      "name": {
+                        "type": "string",
+                        "maxLength": 40
+                      },
+                      "data": {
+                        "type": "object",
+                        "properties": {
+                          "account": {
+                            "type": "string",
+                            "enum": [
+                              "CASH",
+                              "BANK",
+                              "FLOAT"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "account"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "name",
+                      "data"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "PROVIDER"
+                        ]
+                      },
+                      "name": {
+                        "type": "string",
+                        "maxLength": 40
+                      },
+                      "data": {
+                        "default": {
+                          "services": []
+                        },
+                        "type": "object",
+                        "properties": {
+                          "services": {
+                            "default": [],
+                            "maxItems": 10,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "RECHARGE",
+                                "DMT",
+                                "BILL_PAYMENT",
+                                "PAN",
+                                "AADHAAR",
+                                "DOCUMENT",
+                                "AEPS",
+                                "MICRO_ATM",
+                                "ACCOUNT_OPENING",
+                                "CUSTOM"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "name"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "FEE_PRESET"
+                        ]
+                      },
+                      "name": {
+                        "type": "string",
+                        "maxLength": 40
+                      },
+                      "data": {
+                        "type": "object",
+                        "properties": {
+                          "serviceCode": {
+                            "type": "string",
+                            "enum": [
+                              "RECHARGE",
+                              "DMT",
+                              "BILL_PAYMENT",
+                              "PAN",
+                              "AADHAAR",
+                              "DOCUMENT",
+                              "AEPS",
+                              "MICRO_ATM",
+                              "ACCOUNT_OPENING",
+                              "CUSTOM"
+                            ]
+                          },
+                          "slabs": {
+                            "minItems": 1,
+                            "maxItems": 12,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "upToPaise": {
+                                  "nullable": true,
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000000000000
+                                },
+                                "feePaise": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000000000000
+                                }
+                              },
+                              "required": [
+                                "upToPaise",
+                                "feePaise"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "serviceCode",
+                          "slabs"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "name",
+                      "data"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "settings.manage"
+        ]
+      }
+    },
+    "/v1/masters/{id}": {
+      "patch": {
+        "summary": "Rename, reorder, edit or turn off an entry",
+        "tags": [
+          "Masters"
+        ],
+        "operationId": "Masters_update",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "active": {
+                    "type": "boolean"
+                  },
+                  "sortOrder": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9999
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "version"
+                ]
               }
             }
           }

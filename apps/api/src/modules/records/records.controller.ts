@@ -24,13 +24,105 @@ import type { TenantCtx } from '../../common/db';
 import { ApiDoc, parse } from '../../common/http';
 import { IdempotencyService, readIdempotencyKey } from '../../common/idempotency';
 import { RecordsService } from './records.service';
+import { receiptHtml } from './receipt';
+import { z } from 'zod';
+import { AppError } from '../../common/errors';
+import { AuditService } from '../../common/audit';
+import { Db } from '../../common/db';
+import { RedisService } from '../../common/redis';
+import { EmailService } from '../email/email.service';
+import { Sms21Service } from '../messaging/sms21.service';
+
+const sendReceiptSchema = z.object({
+  channel: z.enum(['email', 'whatsapp']),
+  /** Defaults to the customer's saved email / mobile. */
+  to: z.string().trim().max(254).optional().nullable(),
+});
 
 @Controller('v1/records')
 export class RecordsController {
   constructor(
     private readonly records: RecordsService,
     private readonly idem: IdempotencyService,
+    private readonly email: EmailService,
+    private readonly sms21: Sms21Service,
+    private readonly audit: AuditService,
+    private readonly db: Db,
+    private readonly redis: RedisService,
   ) {}
+
+  @Get(':id/receipt')
+  @TenantAccess('records.view')
+  @ApiDoc({ summary: 'Customer receipt for a record (for printing or sharing)', tags: ['Records'] })
+  async receipt(@Ctx() ctx: TenantCtx, @Param('id', ParseUUIDPipe) id: string) {
+    const { receipt, contact } = await this.records.receipt(ctx, id);
+    const sensitive = ctx.permissions.has('customers.view_sensitive');
+    return {
+      ...receipt,
+      // Whether the customer's own contact is on file (so the UI can offer "send to customer").
+      canEmailCustomer: !!contact.email,
+      canMessageCustomer: !!contact.phone,
+      customerPhone: sensitive ? contact.phone : null,
+    };
+  }
+
+  @Post(':id/receipt/send')
+  @HttpCode(200)
+  @TenantAccess('records.view')
+  @ApiDoc({
+    summary: 'Email the receipt, or send it on WhatsApp/SMS through the shop’s SMS21 connection',
+    tags: ['Records'],
+  })
+  async sendReceipt(
+    @Ctx() ctx: TenantCtx,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    const dto = parse(sendReceiptSchema, body);
+    const { receipt, contact } = await this.records.receipt(ctx, id);
+    // Stop a shop account being used to spam: 30 receipts per shop per hour per channel.
+    await this.redis.enforce(`receipt:${dto.channel}:${ctx.tenantId}`, 30, 3600);
+    let toMasked: string;
+    if (dto.channel === 'email') {
+      const to = (dto.to || contact.email || '').toLowerCase();
+      const ok = z.email().safeParse(to);
+      if (!ok.success)
+        throw new AppError('VALIDATION_FAILED', 'Enter a valid email address', undefined, {
+          to: ['Enter a valid email address'],
+        });
+      await this.email.send({
+        to,
+        template: 'receipt',
+        subject: `Receipt ${receipt.receiptNo} from ${receipt.shop.name}`,
+        text: receipt.text.replace(/\*/g, ''),
+        html: receiptHtml(receipt),
+      });
+      toMasked = to.replace(/^(.).*(@.*)$/, '$1***$2');
+    } else {
+      const cfg = await this.sms21.config();
+      if (!cfg.apiKeyEnc || !cfg.notifyEnabled)
+        throw new AppError(
+          'MESSAGING_NOT_CONFIGURED',
+          'WhatsApp sending is not connected. Use “Share on WhatsApp” from your phone instead.',
+        );
+      const to = (dto.to || contact.phone || '').replace(/\D/g, '').slice(-10);
+      if (!/^[6-9]\d{9}$/.test(to))
+        throw new AppError('VALIDATION_FAILED', 'Enter a 10-digit mobile number', undefined, {
+          to: ['Enter a 10-digit mobile number'],
+        });
+      await this.sms21.notify(to, receipt.text, `receipt:${id}:${to}`);
+      toMasked = `••••••${to.slice(-4)}`;
+    }
+    await this.db.inTenant(ctx, (tx) =>
+      this.audit.tenant(tx, ctx, {
+        action: 'record.receipt_sent',
+        targetType: 'record',
+        targetId: id,
+        data: { channel: dto.channel, to: toMasked },
+      }),
+    );
+    return { sent: true, channel: dto.channel, to: toMasked };
+  }
 
   @Get()
   @TenantAccess('records.view')

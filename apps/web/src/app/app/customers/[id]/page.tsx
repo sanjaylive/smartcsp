@@ -24,6 +24,7 @@ import {
 } from '@/components/ui';
 import { QueryState } from '@/components/query-state';
 import { CustomerDialog } from '@/components/customer-form';
+import { BeneficiariesCard, KycCard } from '@/components/customer-kyc';
 import { PaymentBadge, ServiceName, StatusBadge } from '@/components/service';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
@@ -230,6 +231,10 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
                   </ButtonLink>
                 ) : null}
               </Card>
+              <KycCard customer={c} />
+              {ctx?.services.some((s) => s.code === 'DMT') ? (
+                <BeneficiariesCard customerId={c.id} />
+              ) : null}
               <Card>
                 <CardHeader title={t('dashboard.followUpsDue')} />
                 {c.followUps.length === 0 ? (

@@ -97,6 +97,7 @@ export const hi: Record<TranslationKey, string> = {
   'nav.subscription': 'सदस्यता',
   'nav.shop': 'दुकान प्रोफ़ाइल',
   'nav.services': 'सेवाएँ',
+  'nav.masters': 'मास्टर सूचियाँ',
   'nav.integrations': 'इंटीग्रेशन',
   'nav.notifications': 'सूचनाएँ',
   'nav.security': 'सुरक्षा',

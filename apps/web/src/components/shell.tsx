@@ -13,10 +13,13 @@ import {
   CalendarClock,
   ChartColumn,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   FileText,
   History,
   HandCoins,
   Layers,
+  ListChecks,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -43,6 +46,7 @@ import { LanguageToggle, Logo, ThemeToggle } from './toggles';
 import { ServiceIcon, useServiceLabel } from './service';
 import { Alert, Badge } from './ui';
 import { ErrorBlock, LoadingBlock } from './query-state';
+import { NewRecordLink } from '@/components/record-wizard';
 
 const NAV_ICONS: Record<string, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -59,6 +63,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   subscription: Wallet,
   shop: Store,
   services: Layers,
+  masters: ListChecks,
   integrations: PlugZap,
   notifications: Bell,
   security: ShieldCheck,
@@ -70,7 +75,7 @@ const GROUPS: Array<{ key: string; items: string[] }> = [
   { key: 'navGroup.money', items: ['cashbook', 'expenses', 'commissions', 'closing', 'reports'] },
   {
     key: 'navGroup.shop',
-    items: ['staff', 'subscription', 'shop', 'services', 'integrations', 'audit'],
+    items: ['staff', 'subscription', 'shop', 'services', 'masters', 'integrations', 'audit'],
   },
   { key: 'navGroup.account', items: ['notifications', 'security'] },
 ];
@@ -80,7 +85,16 @@ function isActive(pathname: string, path: string) {
   return pathname === path || pathname.startsWith(`${path}/`);
 }
 
-function NavList({ ctx, onNavigate }: { ctx: TenantContext; onNavigate?: () => void }) {
+function NavList({
+  ctx,
+  onNavigate,
+  collapsed = false,
+}: {
+  ctx: TenantContext;
+  onNavigate?: () => void;
+  /** Icon-only rail: labels become tooltips and screen-reader text. */
+  collapsed?: boolean;
+}) {
   const { tk, t } = useI18n();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -88,15 +102,19 @@ function NavList({ ctx, onNavigate }: { ctx: TenantContext; onNavigate?: () => v
   const allowed = new Map(ctx.navigation.map((n) => [n.key, n.path]));
   const currentService = pathname === '/app/records' ? params.get('service') : null;
   return (
-    <nav aria-label={t('a11y.mainNav')} className="flex flex-col gap-5">
+    <nav aria-label={t('a11y.mainNav')} className="flex flex-col gap-4">
       {GROUPS.map((g) => {
         const items = g.items.filter((k) => allowed.has(k));
         if (!items.length) return null;
         return (
           <div key={g.key}>
-            <p className="px-3 pb-1 text-xs font-bold tracking-wide text-fg-muted uppercase">
-              {tk(g.key)}
-            </p>
+            {collapsed ? (
+              <div aria-hidden className="mx-3 mb-2 h-px bg-border" />
+            ) : (
+              <p className="px-3 pb-1 text-[11px] font-bold tracking-wider text-fg-muted/80 uppercase">
+                {tk(g.key)}
+              </p>
+            )}
             <ul className="flex flex-col gap-0.5">
               {items.map((k) => {
                 const path = allowed.get(k)!;
@@ -108,17 +126,26 @@ function NavList({ ctx, onNavigate }: { ctx: TenantContext; onNavigate?: () => v
                       href={path}
                       onClick={onNavigate}
                       aria-current={active ? 'page' : undefined}
+                      title={collapsed ? tk(`nav.${k}`) : undefined}
                       className={cn(
-                        'flex min-h-11 items-center gap-3 rounded-[10px] px-3 text-[15px] font-medium',
+                        'relative flex min-h-9 items-center gap-2.5 rounded-lg px-3 text-sm font-medium transition-colors',
+                        collapsed && 'justify-center px-0',
                         active
                           ? 'bg-brand-bg font-semibold text-brand-strong dark:text-fg'
-                          : 'text-fg hover:bg-surface-muted',
+                          : 'text-fg-muted hover:bg-surface-muted hover:text-fg',
                       )}
                     >
-                      <Icon aria-hidden className="size-5 shrink-0" />
-                      <span className="flex-1">{tk(`nav.${k}`)}</span>
+                      <Icon aria-hidden className="size-[18px] shrink-0" />
+                      <span className={cn('flex-1', collapsed && 'sr-only')}>{tk(`nav.${k}`)}</span>
                       {k === 'notifications' && ctx.unreadNotifications > 0 ? (
-                        <Badge tone="danger">{ctx.unreadNotifications}</Badge>
+                        collapsed ? (
+                          <span
+                            aria-hidden
+                            className="absolute top-1.5 right-2.5 size-2 rounded-full bg-danger"
+                          />
+                        ) : (
+                          <Badge tone="danger">{ctx.unreadNotifications}</Badge>
+                        )
                       ) : null}
                     </Link>
                   </li>
@@ -130,9 +157,13 @@ function NavList({ ctx, onNavigate }: { ctx: TenantContext; onNavigate?: () => v
       })}
       {ctx.serviceNavigation.length > 0 && allowed.has('records') ? (
         <div>
-          <p className="px-3 pb-1 text-xs font-bold tracking-wide text-fg-muted uppercase">
-            {t('navGroup.services')}
-          </p>
+          {collapsed ? (
+            <div aria-hidden className="mx-3 mb-2 h-px bg-border" />
+          ) : (
+            <p className="px-3 pb-1 text-[11px] font-bold tracking-wider text-fg-muted/80 uppercase">
+              {t('navGroup.services')}
+            </p>
+          )}
           <ul className="flex flex-col gap-0.5">
             {ctx.serviceNavigation.map((s) => (
               <li key={s.code}>
@@ -140,15 +171,19 @@ function NavList({ ctx, onNavigate }: { ctx: TenantContext; onNavigate?: () => v
                   href={s.path}
                   onClick={onNavigate}
                   aria-current={currentService === s.code ? 'page' : undefined}
+                  title={collapsed ? label(s.code) : undefined}
                   className={cn(
-                    'flex min-h-11 items-center gap-3 rounded-[10px] px-3 text-[15px]',
+                    'flex min-h-9 items-center gap-2.5 rounded-lg px-3 text-sm',
+                    collapsed && 'justify-center px-0',
                     currentService === s.code
                       ? 'bg-surface-muted font-semibold'
                       : 'hover:bg-surface-muted',
                   )}
                 >
                   <ServiceIcon code={s.code} size="sm" />
-                  <span className="flex-1 truncate">{label(s.code)}</span>
+                  <span className={cn('flex-1 truncate', collapsed && 'sr-only')}>
+                    {label(s.code)}
+                  </span>
                   {!s.canCreate ? (
                     <span className="sr-only">{t('service.historyOnly')}</span>
                   ) : null}
@@ -176,7 +211,7 @@ function ShopSwitcher({ me, ctx }: { me: Me; ctx: TenantContext }) {
   return (
     <DM.Root>
       <DM.Trigger
-        className="flex min-h-11 max-w-[60vw] items-center gap-2 rounded-[10px] px-2 text-left hover:bg-surface-muted sm:max-w-xs"
+        className="flex min-h-10 max-w-[60vw] items-center gap-2 rounded-lg px-2 text-left hover:bg-surface-muted sm:max-w-xs"
         aria-label={t('shell.switchShop')}
       >
         <span
@@ -243,7 +278,7 @@ function UserMenu({ me }: { me: Me }) {
   return (
     <DM.Root>
       <DM.Trigger
-        className="flex size-11 items-center justify-center rounded-full hover:bg-surface-muted"
+        className="flex size-9 items-center justify-center rounded-full hover:bg-surface-muted"
         aria-label={t('shell.account')}
       >
         <span className="flex size-8 items-center justify-center rounded-full bg-brand-alt text-sm font-bold text-white dark:text-bg">
@@ -357,11 +392,11 @@ function BottomNav({ ctx, onMore }: { ctx: TenantContext; onMore: () => void }) 
   return (
     <nav
       aria-label={t('a11y.bottomNav')}
-      className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden print:hidden"
     >
       {primary.slice(0, 2).map(item)}
       {canCreate ? (
-        <Link
+        <NewRecordLink
           href="/app/records/new"
           className="flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold text-brand"
         >
@@ -369,7 +404,7 @@ function BottomNav({ ctx, onMore }: { ctx: TenantContext; onMore: () => void }) 
             <Plus aria-hidden className="size-5" />
           </span>
           <span>{t('nav.newRecord')}</span>
-        </Link>
+        </NewRecordLink>
       ) : null}
       {primary.slice(2).map(item)}
       <button
@@ -391,6 +426,24 @@ export function AppShell({ children }: { children: ReactNode }) {
   const me = useMe();
   const ctx = useTenantContext();
   const [drawer, setDrawer] = useState(false);
+  // Desktop sidebar can shrink to an icon rail; remembered per browser.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem('csp_nav_collapsed') === '1');
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  const toggleNav = () =>
+    setCollapsed((c) => {
+      try {
+        localStorage.setItem('csp_nav_collapsed', c ? '0' : '1');
+      } catch {
+        /* storage unavailable */
+      }
+      return !c;
+    });
 
   useEffect(() => {
     if (me.data?.onboarding && me.data.tenants.length === 0) router.replace('/onboarding');
@@ -419,17 +472,53 @@ export function AppShell({ children }: { children: ReactNode }) {
   const canCreate = c.membership.permissions.includes('records.create');
 
   return (
-    <div className="min-h-dvh overflow-x-clip lg:pl-72">
+    <div
+      className={cn(
+        'min-h-dvh overflow-x-clip transition-[padding] duration-200',
+        collapsed ? 'lg:pl-16' : 'lg:pl-60',
+        'print:pl-0',
+      )}
+    >
       <a href="#main" className="skip-link">
         {t('a11y.skip')}
       </a>
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 flex-col border-r border-border bg-surface lg:flex">
-        <div className="flex h-16 items-center px-5">
-          <Logo href="/app" />
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-border bg-surface transition-[width] duration-200 lg:flex print:hidden',
+          collapsed ? 'w-16' : 'w-60',
+        )}
+      >
+        <div
+          className={cn(
+            'flex h-14 shrink-0 items-center border-b border-border',
+            collapsed ? 'justify-center px-2' : 'px-4',
+          )}
+        >
+          <Logo href="/app" compact={collapsed} />
         </div>
-        <div className="flex-1 overflow-y-auto px-3 pb-6">
-          <NavList ctx={c} />
+        <div
+          className={cn(
+            'flex-1 overflow-x-hidden overflow-y-auto py-4',
+            collapsed ? 'px-2' : 'px-2.5',
+          )}
+        >
+          <NavList ctx={c} collapsed={collapsed} />
         </div>
+        {/* small round toggle sitting on the sidebar's right border, level with the header line */}
+        <button
+          type="button"
+          onClick={toggleNav}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? 'Expand menu' : 'Collapse menu'}
+          title={collapsed ? 'Expand menu' : 'Collapse menu'}
+          className="absolute top-14 -right-3 z-10 grid size-6 -translate-y-1/2 place-items-center rounded-full border border-border bg-surface text-fg-muted shadow-sm transition hover:border-brand/50 hover:text-brand focus-visible:text-brand"
+        >
+          {collapsed ? (
+            <ChevronRight aria-hidden className="size-3.5" strokeWidth={2.5} />
+          ) : (
+            <ChevronLeft aria-hidden className="size-3.5" strokeWidth={2.5} />
+          )}
+        </button>
       </aside>
       <RD.Root open={drawer} onOpenChange={setDrawer}>
         <RD.Portal>
@@ -460,11 +549,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         </RD.Portal>
       </RD.Root>
 
-      <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur">
-        <div className="flex h-16 items-center gap-2 px-3 sm:px-5">
+      <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur print:hidden">
+        <div className="flex h-14 items-center gap-2 px-3 sm:px-5">
           <button
             type="button"
-            className="flex size-11 items-center justify-center rounded-lg hover:bg-surface-muted lg:hidden"
+            className="flex size-10 items-center justify-center rounded-lg hover:bg-surface-muted lg:hidden"
             aria-label={t('shell.openMenu')}
             onClick={() => setDrawer(true)}
           >
@@ -473,13 +562,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           <ShopSwitcher me={m} ctx={c} />
           <div className="ml-auto flex items-center gap-1">
             {canCreate ? (
-              <Link
+              <NewRecordLink
                 href="/app/records/new"
-                className="hidden min-h-11 items-center gap-2 rounded-[10px] bg-brand px-4 text-[15px] font-semibold text-on-brand hover:bg-brand-strong sm:inline-flex"
+                className="mr-1 hidden min-h-9 items-center gap-1.5 rounded-lg bg-brand px-3.5 text-sm font-semibold text-on-brand shadow-sm hover:bg-brand-strong sm:inline-flex"
               >
                 <Plus aria-hidden className="size-4" />
                 {t('nav.newRecord')}
-              </Link>
+              </NewRecordLink>
             ) : null}
             <span className="hidden items-center gap-1 sm:flex">
               <LanguageToggle />
@@ -487,14 +576,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             </span>
             <Link
               href="/app/notifications"
-              className="relative flex size-11 items-center justify-center rounded-lg hover:bg-surface-muted"
+              className="relative flex size-9 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-muted hover:text-fg"
               aria-label={t('shell.notifications', { count: c.unreadNotifications })}
             >
-              <Bell aria-hidden className="size-5" />
+              <Bell aria-hidden className="size-[18px]" />
               {c.unreadNotifications > 0 ? (
                 <span
                   aria-hidden
-                  className="absolute top-1.5 right-1.5 flex min-w-5 items-center justify-center rounded-full bg-danger px-1 text-[11px] font-bold text-white dark:text-bg"
+                  className="absolute top-0.5 right-0.5 flex min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[11px] font-bold text-white dark:text-bg"
                 >
                   {c.unreadNotifications > 99 ? '99+' : c.unreadNotifications}
                 </span>
@@ -505,8 +594,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main id="main" className="mx-auto w-full max-w-7xl px-4 pt-5 pb-28 sm:px-6 lg:pb-12">
-        <Banners ctx={c} />
+      <main
+        id="main"
+        className="mx-auto w-full max-w-[1400px] px-4 pt-4 pb-28 sm:px-6 lg:pb-10 print:max-w-none print:p-0"
+      >
+        <div className="print:hidden">
+          <Banners ctx={c} />
+        </div>
         <div
           className={cn(
             c.supportAccessActive.length ||

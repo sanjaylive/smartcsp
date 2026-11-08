@@ -45,6 +45,7 @@ export interface OtpChallenge {
   challengeId: string;
   expiresInSeconds: number;
   resendAfterSeconds: number;
+  exists?: boolean;
 }
 
 export interface TenantProfile {
@@ -159,6 +160,8 @@ export interface RecordJson {
   expectedCommissionPaise: number;
   receivedCommissionPaise: number;
   paymentMethod: string;
+  paymentMode: string | null;
+  provider: string | null;
   principalMethod: string;
   amountCollectedPaise: number;
   amountAllocatedPaise: number;
@@ -246,10 +249,42 @@ export interface Customer {
   phoneMasked: boolean;
   notes: string | null;
   followUpPreference: string;
+  kyc?: CustomerKyc;
   archivedAt: string | null;
   createdAt: string;
   version: number;
   outstandingDuePaise?: number;
+}
+
+export type KycStatus = 'NONE' | 'PENDING' | 'VERIFIED' | 'REJECTED';
+export interface CustomerKyc {
+  status: KycStatus;
+  idType: string | null;
+  idLast4: string | null;
+  remarks: string | null;
+  verifiedAt: string | null;
+}
+export interface CustomerKycDetail extends CustomerKyc {
+  version: number;
+  documents: {
+    id: string;
+    fileName: string;
+    contentType: string;
+    sizeBytes: number;
+    scanStatus: string;
+    createdAt: string;
+  }[];
+}
+export interface Beneficiary {
+  id: string;
+  customerId: string;
+  name: string;
+  bankName: string;
+  accountLast4: string;
+  ifsc: string | null;
+  active: boolean;
+  lastUsedAt: string | null;
+  version: number;
 }
 
 export interface CustomerDetail extends Customer {
@@ -301,6 +336,7 @@ export interface CollectionJson {
   receiptNo: number;
   customerId: string | null;
   method: string;
+  paymentMode: string | null;
   amountPaise: number;
   receivedOn: string;
   notes: string | null;
@@ -339,6 +375,7 @@ export interface Expense {
   category: string;
   amountPaise: number;
   method: string;
+  paymentMode: string | null;
   paidOn: string;
   vendor: string | null;
   notes: string | null;
@@ -661,4 +698,25 @@ export interface OnboardingState {
 export interface SignedUrl {
   url: string;
   expiresAt?: string;
+}
+
+export type MasterKind = 'EXPENSE_CATEGORY' | 'PAYMENT_MODE' | 'PROVIDER' | 'FEE_PRESET';
+export interface FeeSlab {
+  upToPaise: number | null;
+  feePaise: number;
+}
+export interface ShopMaster {
+  id: string;
+  kind: MasterKind;
+  name: string;
+  data: {
+    account?: 'CASH' | 'BANK' | 'FLOAT';
+    services?: ServiceCode[];
+    serviceCode?: ServiceCode;
+    slabs?: FeeSlab[];
+  };
+  active: boolean;
+  sortOrder: number;
+  version: number;
+  updatedAt: string;
 }

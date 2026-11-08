@@ -6,13 +6,13 @@ import {
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
-  type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, Info, Loader2, CircleAlert, CheckCircle2 } from 'lucide-react';
 import { formatINR } from '@csp2all/shared';
 import { cn } from '@/lib/cn';
+import { DatePicker, type DatePickerProps } from './date-picker';
 
 // ----------------------------------------------------------------------------- Button
 
@@ -53,12 +53,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cn(
-        'inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-55',
+        'inline-flex min-h-10 items-center justify-center gap-2 rounded-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-55',
         size === 'sm'
-          ? 'min-h-9 px-3 text-sm'
+          ? 'min-h-8 px-3 text-[13px]'
           : size === 'lg'
-            ? 'min-h-12 px-6 text-base'
-            : 'px-4 text-[15px]',
+            ? 'min-h-11 px-5 text-[15px]'
+            : 'px-4 text-sm',
         variants[variant],
         className,
       )}
@@ -87,7 +87,7 @@ export function ButtonLink({
     <Link
       href={href}
       className={cn(
-        'inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-4 text-[15px] font-semibold transition',
+        'inline-flex min-h-10 items-center justify-center gap-2 rounded-[10px] px-4 text-sm font-semibold transition',
         variants[variant],
         className,
       )}
@@ -101,7 +101,7 @@ export function ButtonLink({
 // ----------------------------------------------------------------------------- Form fields
 
 const control =
-  'w-full min-h-11 rounded-[10px] border border-border bg-surface px-3 text-[15px] text-fg placeholder:text-fg-muted/80 focus:border-brand focus:outline-none focus:ring-3 focus:ring-focus/30 disabled:bg-surface-muted disabled:opacity-70 aria-[invalid=true]:border-danger';
+  'w-full min-h-10 rounded-[10px] border border-border bg-surface px-3 text-base sm:text-sm text-fg placeholder:text-fg-muted/80 focus:border-brand focus:outline-none focus:ring-3 focus:ring-focus/30 disabled:bg-surface-muted disabled:opacity-70 aria-[invalid=true]:border-danger';
 
 export interface FieldProps {
   label: ReactNode;
@@ -170,6 +170,18 @@ export function Field({
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className, ...rest }, ref) {
+    // Date fields get the branded calendar instead of the browser's own picker.
+    if (rest.type === 'date') {
+      const { type: _type, value, onChange, ...dp } = rest;
+      return (
+        <DatePicker
+          {...(dp as DatePickerProps)}
+          className={className}
+          value={typeof value === 'string' ? value : ''}
+          onChange={onChange}
+        />
+      );
+    }
     return <input ref={ref} className={cn(control, className)} {...rest} />;
   },
 );
@@ -181,15 +193,8 @@ export const Textarea = forwardRef<
   return <textarea ref={ref} className={cn(control, 'min-h-24 py-2', className)} {...rest} />;
 });
 
-export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
-  function Select({ className, children, ...rest }, ref) {
-    return (
-      <select ref={ref} className={cn(control, 'pr-8', className)} {...rest}>
-        {children}
-      </select>
-    );
-  },
-);
+export { Select, type SelectProps } from './select';
+export { DatePicker, type DatePickerProps } from './date-picker';
 
 export function Checkbox({
   label,
@@ -261,12 +266,12 @@ export function CardHeader({
   id?: string;
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
       <div className="min-w-0">
-        <h2 id={id} className="text-lg font-bold">
+        <h2 id={id} className="text-[15px] font-bold">
           {title}
         </h2>
-        {description ? <p className="mt-0.5 text-sm text-fg-muted">{description}</p> : null}
+        {description ? <p className="mt-0.5 text-[13px] text-fg-muted">{description}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
@@ -285,13 +290,15 @@ export function PageHeader({
   icon?: ReactNode;
 }) {
   return (
-    <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-3">
         {icon}
         <div className="min-w-0">
-          <h1 className="text-2xl font-extrabold tracking-tight sm:text-[28px]">{title}</h1>
+          <h1 className="font-display text-xl font-extrabold tracking-tight sm:text-2xl">
+            {title}
+          </h1>
           {description ? (
-            <p className="mt-1 max-w-3xl text-[15px] text-fg-muted">{description}</p>
+            <p className="mt-0.5 max-w-3xl text-sm text-fg-muted">{description}</p>
           ) : null}
         </div>
       </div>
@@ -373,10 +380,14 @@ export function Alert({
   return (
     <div
       role={tone === 'danger' ? 'alert' : 'note'}
-      className={cn('flex flex-wrap items-start gap-3 rounded-xl border px-4 py-3', bg, className)}
+      className={cn(
+        'flex flex-wrap items-start gap-2.5 rounded-xl border px-3.5 py-2.5',
+        bg,
+        className,
+      )}
     >
-      <Icon aria-hidden className={cn('mt-0.5 size-5 shrink-0', fg)} />
-      <div className="min-w-0 flex-1 text-[15px] text-fg">
+      <Icon aria-hidden className={cn('mt-0.5 size-4 shrink-0', fg)} />
+      <div className="min-w-0 flex-1 text-sm text-fg">
         {title ? <p className="font-semibold">{title}</p> : null}
         {children ? <div className={cn(title ? 'mt-0.5' : '', 'text-fg')}>{children}</div> : null}
       </div>
@@ -453,7 +464,7 @@ export function DescList({
         return (
           <div key={item.key ?? i} className="min-w-0">
             <dt className="text-[13px] font-medium text-fg-muted">{item.label}</dt>
-            <dd className="mt-0.5 break-words text-[15px] font-medium">{item.value ?? '—'}</dd>
+            <dd className="mt-0.5 break-words text-sm font-medium">{item.value ?? '—'}</dd>
           </div>
         );
       })}
@@ -484,22 +495,24 @@ export function Stat({
       }[tone]
     : '';
   return (
-    <div className="card flex flex-col gap-1 p-4">
-      <div className="flex items-center gap-2 text-sm font-semibold text-fg-muted">
+    <div className="card flex flex-col gap-0.5 px-4 py-3">
+      <div className="flex items-center gap-1.5 text-[13px] font-semibold text-fg-muted">
         {icon}
         {label}
       </div>
-      <div className={cn('money text-2xl font-extrabold tracking-tight', tc)}>{value}</div>
-      {help ? <p className="text-[13px] leading-snug text-fg-muted">{help}</p> : null}
+      <div className={cn('money font-display text-xl font-extrabold tracking-tight', tc)}>
+        {value}
+      </div>
+      {help ? <p className="text-xs leading-snug text-fg-muted">{help}</p> : null}
     </div>
   );
 }
 
 export const tableCls = {
   wrap: 'overflow-x-auto',
-  table: 'w-full min-w-[640px] border-collapse text-left text-[15px]',
-  th: 'border-b border-border bg-surface-muted/60 px-4 py-2.5 text-[13px] font-semibold text-fg-muted whitespace-nowrap',
-  td: 'border-b border-border px-4 py-3 align-top',
+  table: 'w-full min-w-[640px] border-collapse text-left text-sm',
+  th: 'border-b border-border bg-surface-muted/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-fg-muted whitespace-nowrap',
+  td: 'border-b border-border px-3 py-2.5 align-top',
   num: 'text-right money',
 };
 

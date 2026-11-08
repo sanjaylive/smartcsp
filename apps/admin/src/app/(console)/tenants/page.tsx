@@ -134,9 +134,7 @@ function TenantsInner() {
                           <div className="font-mono text-[11px] text-fg-muted">{t.id}</div>
                         </Td>
                         <Td>{t.ownerDisplayName}</Td>
-                        <Td>
-                          {t.district}, {t.state}
-                        </Td>
+                        <Td>{[t.district, t.state].filter(Boolean).join(', ') || '—'}</Td>
                         <Td>
                           <StatusBadge status={t.status} />
                         </Td>

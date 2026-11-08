@@ -31,7 +31,8 @@ import {
   Textarea,
   tableCls,
 } from '@/components/ui';
-import { Dialog } from '@/components/ui/dialog';
+import { Dialog, Drawer } from '@/components/ui/dialog';
+import { accountForMethod, useMasters } from '@/lib/masters';
 import { QueryState } from '@/components/query-state';
 import { MoneyInput, paiseToInput, rupeesOrZero } from '@/components/money-input';
 import { PaymentBadge, ServiceName } from '@/components/service';
@@ -157,7 +158,14 @@ function CollectDialog({ group, onClose }: { group: DueGroup; onClose: () => voi
   const [amounts, setAmounts] = useState<Record<string, string>>(() =>
     Object.fromEntries(group.records.map((r) => [r.id, paiseToInput(r.amountDuePaise)])),
   );
-  const [method, setMethod] = useState<'CASH' | 'UPI' | 'BANK'>('CASH');
+  const masters = useMasters();
+  // "CASH" | "UPI" | "BANK" or "mode:<name>" for a shop-defined payment mode.
+  const [payWith, setPayWith] = useState<string>('CASH');
+  const customMode = payWith.startsWith('mode:')
+    ? masters.active('PAYMENT_MODE').find((x) => `mode:${x.name}` === payWith)
+    : undefined;
+  const method = (customMode ? (customMode.data.account === 'CASH' ? 'CASH' : 'UPI') : payWith) as
+    'CASH' | 'UPI' | 'BANK';
   const [receivedOn, setReceivedOn] = useState(today);
   const [notes, setNotes] = useState('');
   const parsed = group.records.map((r) => ({ r, paise: rupeesOrZero(amounts[r.id] ?? '') }));
@@ -197,13 +205,14 @@ function CollectDialog({ group, onClose }: { group: DueGroup; onClose: () => voi
     m.mutate({
       customerId: group.customerId,
       method,
+      paymentMode: customMode?.name ?? null,
       receivedOn,
       notes: notes.trim() || null,
       allocations,
     });
   };
   return (
-    <Dialog
+    <Drawer
       open
       size="lg"
       onOpenChange={(o) => !o && onClose()}
@@ -259,16 +268,22 @@ function CollectDialog({ group, onClose }: { group: DueGroup; onClose: () => voi
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t('record.paymentMethod')}>
             {(f) => (
-              <Select
-                id={f.id}
-                value={method}
-                onChange={(e) => setMethod(e.target.value as typeof method)}
-              >
+              <Select id={f.id} value={payWith} onChange={(e) => setPayWith(e.target.value)}>
                 {(['CASH', 'UPI', 'BANK'] as const).map((x) => (
                   <option key={x} value={x}>
                     {tk(`method.${x}`)}
                   </option>
                 ))}
+                {masters
+                  .active('PAYMENT_MODE')
+                  .filter(
+                    (x) => x.data.account === 'CASH' || x.data.account === accountForMethod('BANK'),
+                  )
+                  .map((x) => (
+                    <option key={x.id} value={`mode:${x.name}`}>
+                      {x.name}
+                    </option>
+                  ))}
               </Select>
             )}
           </Field>
@@ -277,6 +292,7 @@ function CollectDialog({ group, onClose }: { group: DueGroup; onClose: () => voi
               <Input
                 id={f.id}
                 type="date"
+                required
                 max={today}
                 value={receivedOn}
                 onChange={(e) => setReceivedOn(e.target.value)}
@@ -294,7 +310,7 @@ function CollectDialog({ group, onClose }: { group: DueGroup; onClose: () => voi
           <Alert tone="danger">{errs.formMessage}</Alert>
         ) : null}
       </div>
-    </Dialog>
+    </Drawer>
   );
 }
 

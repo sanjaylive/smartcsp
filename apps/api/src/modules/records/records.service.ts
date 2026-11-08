@@ -24,6 +24,8 @@ import {
 import type { z } from 'zod';
 import { Db, nextCounter, type TenantCtx, type Tx } from '../../common/db';
 import { AppError, notFound, versionConflict, zodToAppError } from '../../common/errors';
+import { MastersService } from '../masters/masters.service';
+import { buildReceipt } from './receipt';
 import { AuditService } from '../../common/audit';
 import { requirePerm } from '../../common/access';
 import { big, d, n, pageResult, paginate, toDate } from '../../common/serialize';
@@ -75,6 +77,7 @@ export class RecordsService {
     private readonly entitlements: EntitlementsService,
     private readonly availability: ServiceAvailabilityService,
     private readonly audit: AuditService,
+    private readonly masters: MastersService,
   ) {}
 
   private async resolveService(
@@ -253,6 +256,13 @@ export class RecordsService {
         principalMethod: dto.principalMethod,
       };
       const { receivable, due } = validateAmounts(amounts);
+      const paymentMode = await this.masters.resolvePaymentMode(
+        tx,
+        ctx,
+        dto.paymentMode,
+        dto.paymentMethod,
+      );
+      const provider = await this.masters.resolveProvider(tx, ctx, dto.provider);
 
       await this.entitlements.consumeRecordQuota(tx, ctx.tenantId, ctx.timezone);
       const branch = await tx.branch.findFirstOrThrow({
@@ -276,6 +286,8 @@ export class RecordsService {
           expectedCommissionPaise: amounts.expectedCommission,
           paymentMethod: dto.paymentMethod,
           principalMethod: dto.principalMethod,
+          paymentMode,
+          provider,
           amountCollectedPaise: amounts.collected,
           amountDuePaise: due,
           paymentStatus: paymentStatusFor(receivable, amounts.collected),
@@ -293,6 +305,18 @@ export class RecordsService {
         },
       });
       await this.event(tx, ctx, record.id, 'OPERATIONAL', null, dto.opStatus, null, { source });
+      if (svc.code === 'DMT' && record.customerId) {
+        // Keep the customer's most-used beneficiaries at the top of the list.
+        await tx.beneficiary.updateMany({
+          where: {
+            tenantId: ctx.tenantId,
+            customerId: record.customerId,
+            accountLast4: String(details.accountLast4 ?? ''),
+            bankName: String(details.bankName ?? ''),
+          },
+          data: { lastUsedAt: new Date() },
+        });
+      }
       if (dto.followUpDate) {
         await tx.followUpTask.create({
           data: {
@@ -579,6 +603,17 @@ export class RecordsService {
         );
       }
       const { receivable } = validateAmounts(amounts);
+      // A new method invalidates the old label unless a matching mode is sent with it.
+      const paymentMode =
+        dto.paymentMode !== undefined
+          ? await this.masters.resolvePaymentMode(tx, ctx, dto.paymentMode, amounts.paymentMethod)
+          : dto.paymentMethod && dto.paymentMethod !== rec.paymentMethod
+            ? null
+            : undefined;
+      const provider =
+        dto.provider !== undefined
+          ? await this.masters.resolveProvider(tx, ctx, dto.provider)
+          : undefined;
       const paid = amounts.collected + rec.amountAllocatedPaise;
       if (paid > receivable)
         throw new AppError('AMOUNT_EXCEEDS_DUE', 'Collections exceed the new amount owed');
@@ -604,6 +639,8 @@ export class RecordsService {
           amountCollectedPaise: amounts.collected,
           paymentMethod: amounts.paymentMethod,
           principalMethod: amounts.principalMethod,
+          paymentMode,
+          provider,
           principalDirection: direction,
           amountDuePaise: receivable - paid,
           paymentStatus: paymentStatusFor(receivable, paid),
@@ -675,6 +712,32 @@ export class RecordsService {
       const json = [];
       for (const it of items) json.push(await this.toJson(ctx, it, tx));
       return pageResult(json, total, q.page, q.pageSize);
+    });
+  }
+
+  /** Customer receipt data, plus the customer's contact details for sending it. */
+  async receipt(ctx: TenantCtx, id: string) {
+    return this.db.inTenant(ctx, async (tx) => {
+      const rec = await this.loadVisible(tx, ctx, id);
+      const [tenant, customer, customService] = await Promise.all([
+        tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId } }),
+        rec.customerId
+          ? tx.customer.findFirst({
+              where: { id: rec.customerId, tenantId: ctx.tenantId },
+              select: { name: true, phone: true, email: true },
+            })
+          : null,
+        rec.customServiceId
+          ? tx.customServiceDefinition.findFirst({
+              where: { id: rec.customServiceId, tenantId: ctx.tenantId },
+              select: { name: true, fields: true },
+            })
+          : null,
+      ]);
+      return {
+        receipt: buildReceipt({ ...rec, customer }, tenant, { customService }),
+        contact: { phone: customer?.phone ?? null, email: customer?.email ?? null },
+      };
     });
   }
 
@@ -803,6 +866,8 @@ export class RecordsService {
       expectedCommissionPaise: n(r.expectedCommissionPaise),
       receivedCommissionPaise: n(r.receivedCommissionPaise),
       paymentMethod: r.paymentMethod,
+      paymentMode: r.paymentMode,
+      provider: r.provider,
       principalMethod: r.principalMethod,
       amountCollectedPaise: n(r.amountCollectedPaise),
       amountAllocatedPaise: n(r.amountAllocatedPaise),

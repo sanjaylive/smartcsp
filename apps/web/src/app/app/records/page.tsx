@@ -19,7 +19,6 @@ import type { Page, RecordJson } from '@/lib/types';
 import {
   Alert,
   Button,
-  ButtonLink,
   Card,
   EmptyState,
   Field,
@@ -40,6 +39,7 @@ import {
 } from '@/components/service';
 import { Pagination } from '@/components/pagination';
 import { cn } from '@/lib/cn';
+import { NewRecordLink } from '@/components/record-wizard';
 
 const FILTER_KEYS = ['service', 'status', 'paymentStatus', 'from', 'to', 'q'] as const;
 
@@ -99,9 +99,13 @@ function RecordsInner() {
         }
         actions={
           showNew ? (
-            <ButtonLink href={newHref} icon={<Plus aria-hidden className="size-4" />}>
+            <NewRecordLink
+              href={newHref}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[10px] bg-brand px-4 text-sm font-semibold text-on-brand shadow-sm transition hover:bg-brand-strong"
+            >
+              <Plus aria-hidden className="size-4" />
               {t('nav.newRecord')}
-            </ButtonLink>
+            </NewRecordLink>
           ) : null
         }
       />
@@ -116,7 +120,7 @@ function RecordsInner() {
       <Card className="mb-4 p-4">
         <form
           onSubmit={onSearch}
-          className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6"
+          className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7"
           role="search"
           aria-label={t('records.filters')}
         >
@@ -188,7 +192,7 @@ function RecordsInner() {
               </Select>
             )}
           </Field>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 lg:col-span-2">
             <Field label={t('range.from')}>
               {(p) => (
                 <Input
@@ -238,7 +242,12 @@ function RecordsInner() {
                 description={anyFilter ? t('records.noMatchHelp') : t('records.emptyHelp')}
                 action={
                   showNew && !anyFilter ? (
-                    <ButtonLink href={newHref}>{t('nav.newRecord')}</ButtonLink>
+                    <NewRecordLink
+                      href={newHref}
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[10px] bg-brand px-4 text-sm font-semibold text-on-brand shadow-sm transition hover:bg-brand-strong"
+                    >
+                      {t('nav.newRecord')}
+                    </NewRecordLink>
                   ) : null
                 }
               />

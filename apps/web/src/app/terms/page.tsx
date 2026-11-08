@@ -1,17 +1,14 @@
+import type { Metadata } from 'next';
 import { LegalPage } from '@/components/legal';
+import { TERMS } from '@/lib/legal-content';
 
-export const metadata = { title: 'Terms of Service' };
+export const metadata: Metadata = {
+  title: 'Terms & Conditions',
+  description: 'The terms for using the counter record-keeping app.',
+  robots: { index: true, follow: true },
+  alternates: { canonical: '/terms' },
+};
 
-export default function Terms() {
-  return (
-    <LegalPage
-      title="auth.email.terms"
-      sections={[
-        { h: 'legal.terms.h1', p: 'legal.terms.p1' },
-        { h: 'legal.terms.h2', p: 'legal.terms.p2' },
-        { h: 'legal.terms.h3', p: 'legal.terms.p3' },
-        { h: 'legal.terms.h4', p: 'legal.terms.p4' },
-      ]}
-    />
-  );
+export default function Page() {
+  return <LegalPage doc={TERMS} />;
 }

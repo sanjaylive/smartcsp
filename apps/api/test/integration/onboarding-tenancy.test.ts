@@ -34,6 +34,26 @@ describe('Onboarding', () => {
     expect(draft.body.shop.shopName).toBe('Resume Kendra');
   });
 
+  it('creates a shop from just shop name, owner and mobile (no state/district)', async () => {
+    const c = await signIn(t);
+    await c
+      .put('/v1/onboarding/shop', {
+        shopName: 'Quick Start Kendra',
+        ownerName: 'Meena',
+        contactPhone: '9876501234',
+      })
+      .expect(200);
+    await c.put('/v1/onboarding/services', { services: ['PAN', 'AADHAAR'] }).expect(200);
+    const done = await c.post('/v1/onboarding/complete').expect(200);
+    const tenant = await t.owner.tenant.findUniqueOrThrow({ where: { id: done.body.tenantId } });
+    expect(tenant).toMatchObject({
+      name: 'Quick Start Kendra',
+      state: '',
+      district: '',
+      contactPhone: '9876501234',
+    });
+  });
+
   it('enforces the starting plan service limit', async () => {
     const c = await signIn(t);
     await c

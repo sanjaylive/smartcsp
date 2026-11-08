@@ -542,6 +542,7 @@ function PaymentForm({
             <Input
               id={p.id}
               type="date"
+              required
               max={today}
               value={paidOn}
               onChange={(e) => setPaidOn(e.target.value)}

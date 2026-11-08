@@ -29,7 +29,7 @@ import { EntitlementsService } from '../subscription/entitlements.service';
 import { visibleWhere } from '../records/records.service';
 
 const uploadSchema = z.object({
-  ownerType: z.enum(['RECORD', 'CUSTOMER', 'PAYMENT_SUBMISSION', 'TENANT_LOGO']),
+  ownerType: z.enum(['RECORD', 'CUSTOMER', 'CUSTOMER_KYC', 'PAYMENT_SUBMISSION', 'TENANT_LOGO']),
   ownerId: z.uuid(),
 });
 
@@ -136,6 +136,22 @@ export class AttachmentsController implements OnModuleInit {
       case 'CUSTOMER': {
         if (!ctx.permissions.has(mode === 'write' ? 'customers.manage' : 'customers.view'))
           throw denied('customers.view');
+        if (
+          !(await tx.customer.findFirst({
+            where: { id: ownerId, tenantId: ctx.tenantId },
+            select: { id: true },
+          }))
+        )
+          throw notFound('Customer');
+        return;
+      }
+      case 'CUSTOMER_KYC': {
+        // ID documents are sensitive personal data: both reading and uploading need
+        // customers.view_sensitive, and uploading also needs customers.manage.
+        if (!ctx.permissions.has('customers.view_sensitive'))
+          throw denied('customers.view_sensitive');
+        if (mode === 'write' && !ctx.permissions.has('customers.manage'))
+          throw denied('customers.manage');
         if (
           !(await tx.customer.findFirst({
             where: { id: ownerId, tenantId: ctx.tenantId },
