@@ -112,7 +112,6 @@ test('5. add a customer and a manual AEPS record', async () => {
 
   await page.goto('/app/records/new?service=AEPS');
   await expect(page.getByRole('heading', { name: 'New AEPS record' })).toBeVisible();
-  await expect(page.getByTestId('service-notice')).toContainText('Never record biometric data');
   await expect(page.getByText('This is a manual record entered by your shop')).toBeVisible();
   await page.getByRole('combobox', { name: 'Find a customer' }).fill(customerName.split(' ')[0]);
   await page.getByRole('option').getByRole('button', { name: customerName }).click();
@@ -189,13 +188,13 @@ test('8. a due and a partial collection', async () => {
   await page.getByRole('option').getByRole('button', { name: customerName }).click();
   await page.getByLabel('Beneficiary name').fill('Mohan Lal');
   await page.getByLabel('Bank name').fill('State Bank of India');
-  // Client-side validation from the shared schema: only the last 4 digits are accepted.
-  await page.getByLabel('Account number — last 4 digits').fill('12');
+  // Client-side validation from the shared schema: the full account number is required.
+  await page.getByLabel('Account number').fill('4321');
   await page.getByLabel('Transfer amount').fill('2000');
   await page.getByLabel('Customer fee (your charge)').fill('20');
   await page.getByRole('button', { name: 'Save and post to cashbook' }).click();
-  await expect(page.getByText('Enter only the last 4 digits')).toBeVisible();
-  await page.getByLabel('Account number — last 4 digits').fill('4321');
+  await expect(page.getByText('Enter the full account number (9–18 digits)')).toBeVisible();
+  await page.getByLabel('Account number').fill('30912345674321');
   await expect(page.getByLabel('Amount collected now')).toHaveValue('2020');
   await page.getByLabel('Amount collected now').fill('1000');
   await expect(page.getByTestId('due-hint')).toContainText('₹1,020.00');

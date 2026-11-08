@@ -329,14 +329,14 @@ model Customer {
   @@map("customers")
 }
 
-/// Saved DMT beneficiaries of a customer (only the last 4 digits of the account are kept).
+/// Saved DMT beneficiaries of a customer.
 model Beneficiary {
   id              String    @id @default(uuid(7)) @db.Uuid
   tenantId        String    @db.Uuid
   customerId      String    @db.Uuid
   name            String
   bankName        String
-  accountLast4    String
+  accountNumber   String
   ifsc            String?
   active          Boolean   @default(true)
   lastUsedAt      DateTime?
@@ -348,7 +348,7 @@ model Beneficiary {
   customer Customer @relation(fields: [tenantId, customerId], references: [tenantId, id], onDelete: Cascade)
 
   @@unique([tenantId, id])
-  @@unique([tenantId, customerId, bankName, accountLast4, name], map: "beneficiaries_tenantId_customerId_bankName_accountLast4_name_ke")
+  @@unique([tenantId, customerId, bankName, accountNumber, name], map: "beneficiaries_customer_bank_account_name_key")
   @@index([tenantId, customerId])
   @@map("beneficiaries")
 }

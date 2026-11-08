@@ -16,7 +16,7 @@
   "mobile.common.apply": "लागू करें",
   "mobile.common.loadMore": "और दिखाएँ",
   "validation.phone": "10 अंकों का मोबाइल नंबर दर्ज करें",
-  "validation.last4": "केवल आख़िरी 4 अंक दर्ज करें",
+  "validation.accountNumber": "पूरी खाता संख्या दर्ज करें (9–18 अंक)",
   "validation.ifsc": "अमान्य IFSC (जैसे SBIN0001234)",
   "validation.date": "YYYY-MM-DD प्रारूप उपयोग करें",
   "validation.maxLength": "अधिकतम {max} अक्षर उपयोग करें",

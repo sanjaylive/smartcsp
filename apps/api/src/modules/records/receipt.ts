@@ -2,8 +2,7 @@
  * Customer receipt for a service record. One builder feeds the printable web receipt, the email
  * and the WhatsApp/SMS text, so all three always show the same thing.
  *
- * Privacy: only non-sensitive fields are printed, account numbers are shown as their last 4
- * digits, and the customer's phone is masked. Transaction value is labelled separately from
+ * Privacy: only non-sensitive fields are printed and the customer's phone is masked. Transaction value is labelled separately from
  * the shop's fee so the customer sees exactly what they paid for.
  */
 import type { ServiceRecord, Tenant } from '@prisma/client';
@@ -77,14 +76,12 @@ function detailLines(
     )
       continue;
     let value: string;
-    if (f.type === 'last4') value = `••••${String(raw)}`;
-    else if (f.type === 'select')
+    if (f.type === 'select')
       value = tr(f.options?.find((o) => o.value === raw)?.labelKey, String(raw));
     else if (f.type === 'boolean') value = 'Yes';
     else value = String(raw);
     const label = serviceCode === 'CUSTOM' ? f.labelKey : tr(f.labelKey, f.key);
-    // Receipts are narrow (thermal rolls): "Account number — last 4 digits" → "Account number".
-    out.push({ label: label.replace(/\s*[—-]\s*last 4 digits$/i, ''), value });
+    out.push({ label, value });
   }
   return out.slice(0, 8);
 }

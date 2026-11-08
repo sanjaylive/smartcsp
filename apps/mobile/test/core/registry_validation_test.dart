@@ -66,11 +66,12 @@ void main() {
       expect(validatePhone(''), isNull);
     });
 
-    test('last 4 digits only', () {
-      expect(validateLast4('1234'), isNull);
-      expect(validateLast4('12345'), const ValidationIssue('validation.last4'));
-      expect(validateLast4('12a4'), const ValidationIssue('validation.last4'));
-      expect(validateLast4('', required: true), const ValidationIssue('common.required'));
+    test('full account number (9–18 digits)', () {
+      expect(validateAccountNumber('123456789012'), isNull);
+      expect(validateAccountNumber('1234 5678 9012'), isNull);
+      expect(validateAccountNumber('1234'), const ValidationIssue('validation.accountNumber'));
+      expect(validateAccountNumber('12345678a012'), const ValidationIssue('validation.accountNumber'));
+      expect(validateAccountNumber('', required: true), const ValidationIssue('common.required'));
     });
 
     test('IFSC (case-insensitive input)', () {
@@ -92,11 +93,11 @@ void main() {
   });
 
   group('details validation and JSON', () {
-    test('DMT requires beneficiary, bank and last-4; reports each field', () {
+    test('DMT requires beneficiary, bank and full account number; reports each field', () {
       final dmt = serviceRegistry['DMT']!;
-      final issues = validateDetails(dmt.fields, {'accountLast4': '123456'});
-      expect(issues.keys, containsAll(['beneficiaryName', 'bankName', 'accountLast4']));
-      expect(issues['accountLast4'], const ValidationIssue('validation.last4'));
+      final issues = validateDetails(dmt.fields, {'accountNumber': '1234'});
+      expect(issues.keys, containsAll(['beneficiaryName', 'bankName', 'accountNumber']));
+      expect(issues['accountNumber'], const ValidationIssue('validation.accountNumber'));
     });
 
     test('buildDetailsJson keeps only known keys, drops empty optionals, normalises IFSC', () {
@@ -104,12 +105,12 @@ void main() {
       final json = buildDetailsJson(dmt.fields, {
         'beneficiaryName': '  Sita ',
         'bankName': 'Demo Bank',
-        'accountLast4': '1234',
+        'accountNumber': '1234 5678 9012',
         'ifsc': 'sbin0001234',
         'senderMobile': '',
         'smuggled': 'x',
       });
-      expect(json, {'beneficiaryName': 'Sita', 'bankName': 'Demo Bank', 'accountLast4': '1234', 'ifsc': 'SBIN0001234'});
+      expect(json, {'beneficiaryName': 'Sita', 'bankName': 'Demo Bank', 'accountNumber': '123456789012', 'ifsc': 'SBIN0001234'});
     });
 
     test('checklist items are validated and serialised', () {
@@ -150,12 +151,6 @@ void main() {
       expect(aeps.direction({'operationType': 'CASH_WITHDRAWAL'}), PrincipalDirection.payout);
       expect(aeps.direction({'operationType': 'CASH_DEPOSIT'}), PrincipalDirection.collect);
       expect(aeps.direction({'operationType': 'BALANCE_ENQUIRY'}), PrincipalDirection.none);
-    });
-
-    test('AEPS, MicroATM and Aadhaar carry privacy notices', () {
-      expect(serviceRegistry['AEPS']!.noticeKey, 'notice.aeps');
-      expect(serviceRegistry['MICRO_ATM']!.noticeKey, 'notice.microatm');
-      expect(serviceRegistry['AADHAAR']!.noticeKey, 'notice.aadhaar');
     });
 
     test('transitions and reason rules mirror the server', () {

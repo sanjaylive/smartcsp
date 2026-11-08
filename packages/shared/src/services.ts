@@ -24,7 +24,7 @@ export const SERVICE_CODES = [
 export type ServiceCode = (typeof SERVICE_CODES)[number];
 
 export type FieldType =
-  'text' | 'number' | 'date' | 'select' | 'phone' | 'last4' | 'ifsc' | 'checklist' | 'boolean';
+  'text' | 'number' | 'date' | 'select' | 'phone' | 'account' | 'ifsc' | 'checklist' | 'boolean';
 
 export interface FieldOption {
   value: string;
@@ -72,8 +72,6 @@ export interface ServiceDefinition {
   dashboardWidgets: Array<'volume' | 'pendingApplications' | 'cashPayout' | 'cashCollected'>;
   /** Whether a provider connector could, in principle, execute this service. */
   providerCapable: boolean;
-  /** Extra regulatory/privacy notice shown on the form. */
-  noticeKey?: string;
 }
 
 const opt = (values: string[], prefix: string): FieldOption[] =>
@@ -179,11 +177,10 @@ export const SERVICE_REGISTRY: Record<ServiceCode, ServiceDefinition> = {
       },
       { key: 'bankName', type: 'text', labelKey: 'field.bankName', required: true, maxLength: 80 },
       {
-        key: 'accountLast4',
-        type: 'last4',
-        labelKey: 'field.accountLast4',
+        key: 'accountNumber',
+        type: 'account',
+        labelKey: 'field.accountNumber',
         required: true,
-        helpKey: 'help.accountLast4',
       },
       { key: 'ifsc', type: 'ifsc', labelKey: 'field.ifsc' },
       {
@@ -196,7 +193,6 @@ export const SERVICE_REGISTRY: Record<ServiceCode, ServiceDefinition> = {
     principalDirection: () => 'COLLECT',
     dashboardWidgets: ['volume', 'cashCollected'],
     providerCapable: true,
-    noticeKey: 'notice.dmt',
   },
   BILL_PAYMENT: {
     code: 'BILL_PAYMENT',
@@ -320,7 +316,6 @@ export const SERVICE_REGISTRY: Record<ServiceCode, ServiceDefinition> = {
     principalDirection: () => 'NONE',
     dashboardWidgets: ['pendingApplications'],
     providerCapable: false,
-    noticeKey: 'notice.aadhaar',
   },
   DOCUMENT: {
     code: 'DOCUMENT',
@@ -392,7 +387,6 @@ export const SERVICE_REGISTRY: Record<ServiceCode, ServiceDefinition> = {
     principalDirection: opDirection,
     dashboardWidgets: ['volume', 'cashPayout'],
     providerCapable: true,
-    noticeKey: 'notice.aeps',
   },
   MICRO_ATM: {
     code: 'MICRO_ATM',
@@ -417,7 +411,6 @@ export const SERVICE_REGISTRY: Record<ServiceCode, ServiceDefinition> = {
     principalDirection: opDirection,
     dashboardWidgets: ['volume', 'cashPayout'],
     providerCapable: true,
-    noticeKey: 'notice.microatm',
   },
   ACCOUNT_OPENING: {
     code: 'ACCOUNT_OPENING',
@@ -442,10 +435,9 @@ export const SERVICE_REGISTRY: Record<ServiceCode, ServiceDefinition> = {
       { key: 'applicationRef', type: 'text', labelKey: 'field.applicationRef', maxLength: 40 },
       { key: 'submittedOn', type: 'date', labelKey: 'field.submittedOn' },
       {
-        key: 'accountLast4',
-        type: 'last4',
-        labelKey: 'field.accountLast4',
-        helpKey: 'help.accountLast4',
+        key: 'accountNumber',
+        type: 'account',
+        labelKey: 'field.accountNumber',
       },
     ],
     principalDirection: () => 'NONE',
@@ -555,8 +547,11 @@ function fieldSchema(f: FieldDef): z.ZodTypeAny {
     case 'phone':
       s = z.string().regex(/^[6-9]\d{9}$/, 'Enter a 10-digit mobile number');
       break;
-    case 'last4':
-      s = z.string().regex(/^\d{4}$/, 'Enter only the last 4 digits');
+    case 'account':
+      s = z
+        .string()
+        .transform((v) => v.replace(/[\s-]/g, ''))
+        .pipe(z.string().regex(/^\d{9,18}$/, 'Enter the full account number (9–18 digits)'));
       break;
     case 'ifsc':
       s = z

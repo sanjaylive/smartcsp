@@ -44,17 +44,20 @@ test('detects Aadhaar-like (Verhoeff) and card-like (Luhn) numbers only', () => 
 
 test('service detail schemas are strict and validated', () => {
   const dmt = buildDetailsSchema(SERVICE_REGISTRY.DMT.fields);
+  const ok = dmt.safeParse({
+    beneficiaryName: 'Asha',
+    bankName: 'Demo Bank',
+    accountNumber: '1234 5678 9012',
+  });
+  assert.equal(ok.success, true);
+  assert.equal(ok.success && ok.data.accountNumber, '123456789012');
   assert.equal(
-    dmt.safeParse({ beneficiaryName: 'Asha', bankName: 'Demo Bank', accountLast4: '1234' }).success,
-    true,
-  );
-  assert.equal(
-    dmt.safeParse({ beneficiaryName: 'Asha', bankName: 'Demo Bank', accountLast4: '123456789' })
+    dmt.safeParse({ beneficiaryName: 'Asha', bankName: 'Demo Bank', accountNumber: '1234' })
       .success,
     false,
   );
   assert.equal(
-    dmt.safeParse({ beneficiaryName: 'Asha', bankName: 'X', accountLast4: '1234', pin: '1111' })
+    dmt.safeParse({ beneficiaryName: 'Asha', bankName: 'X', accountNumber: '123456789', pin: '1' })
       .success,
     false,
   );

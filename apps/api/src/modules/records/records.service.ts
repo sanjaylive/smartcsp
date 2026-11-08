@@ -311,7 +311,7 @@ export class RecordsService {
           where: {
             tenantId: ctx.tenantId,
             customerId: record.customerId,
-            accountLast4: String(details.accountLast4 ?? ''),
+            accountNumber: String(details.accountNumber ?? ''),
             bankName: String(details.bankName ?? ''),
           },
           data: { lastUsedAt: new Date() },

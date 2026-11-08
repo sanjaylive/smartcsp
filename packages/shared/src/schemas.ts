@@ -564,7 +564,10 @@ const ifscCode = z
 export const beneficiaryCreateSchema = z.object({
   name: safeText(80).pipe(z.string().min(2, 'Enter the beneficiary name')),
   bankName: safeText(80).pipe(z.string().min(2, 'Enter the bank name')),
-  accountLast4: z.string().regex(/^\d{4}$/, 'Enter only the last 4 digits'),
+  accountNumber: z
+    .string()
+    .transform((v) => v.replace(/[\s-]/g, ''))
+    .pipe(z.string().regex(/^\d{9,18}$/, 'Enter the full account number (9–18 digits)')),
   ifsc: ifscCode.optional().nullable(),
 });
 export const beneficiaryUpdateSchema = beneficiaryCreateSchema

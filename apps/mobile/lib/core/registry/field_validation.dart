@@ -25,7 +25,7 @@ class ValidationIssue {
 }
 
 final RegExp phonePattern = RegExp(r'^[6-9]\d{9}$');
-final RegExp last4Pattern = RegExp(r'^\d{4}$');
+final RegExp accountNumberPattern = RegExp(r'^\d{9,18}$');
 final RegExp ifscPattern = RegExp(r'^[A-Z]{4}0[A-Z0-9]{6}$');
 final RegExp emailPattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$');
 
@@ -42,10 +42,10 @@ ValidationIssue? validatePhone(String? v, {bool required = false}) {
   return phonePattern.hasMatch(s) ? null : const ValidationIssue('validation.phone');
 }
 
-ValidationIssue? validateLast4(String? v, {bool required = false}) {
-  final s = (v ?? '').trim();
+ValidationIssue? validateAccountNumber(String? v, {bool required = false}) {
+  final s = (v ?? '').replaceAll(RegExp(r'[\s-]'), '');
   if (s.isEmpty) return required ? const ValidationIssue('common.required') : null;
-  return last4Pattern.hasMatch(s) ? null : const ValidationIssue('validation.last4');
+  return accountNumberPattern.hasMatch(s) ? null : const ValidationIssue('validation.accountNumber');
 }
 
 ValidationIssue? validateIfsc(String? v, {bool required = false}) {
@@ -93,8 +93,8 @@ ValidationIssue? validateField(FieldDef f, Object? value) {
       return f.options.any((o) => o.value == value) ? null : const ValidationIssue('validation.option');
     case FieldType.phone:
       return validatePhone(value.toString(), required: f.required);
-    case FieldType.last4:
-      return validateLast4(value.toString(), required: f.required);
+    case FieldType.account:
+      return validateAccountNumber(value.toString(), required: f.required);
     case FieldType.ifsc:
       return validateIfsc(value.toString(), required: f.required);
     case FieldType.checklist:
@@ -143,10 +143,11 @@ Map<String, Object?> buildDetailsJson(List<FieldDef> fields, Map<String, Object?
     switch (f.type) {
       case FieldType.text:
       case FieldType.phone:
-      case FieldType.last4:
       case FieldType.date:
       case FieldType.select:
         out[f.key] = v.toString().trim();
+      case FieldType.account:
+        out[f.key] = v.toString().replaceAll(RegExp(r'[\s-]'), '');
       case FieldType.ifsc:
         out[f.key] = v.toString().trim().toUpperCase();
       case FieldType.number:

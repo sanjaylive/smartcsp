@@ -79,7 +79,7 @@ describe('DMT beneficiaries', () => {
         .post(`/v1/customers/${customerId}/beneficiaries`, {
           name: 'Anil Kumar',
           bankName: 'Demo Bank',
-          accountLast4: '4321',
+          accountNumber: '501002345674321',
           ifsc: 'sbin0001234',
         })
         .expect(201)
@@ -89,14 +89,14 @@ describe('DMT beneficiaries', () => {
       .post(`/v1/customers/${customerId}/beneficiaries`, {
         name: 'Anil Kumar',
         bankName: 'Demo Bank',
-        accountLast4: '4321',
+        accountNumber: '501002345674321',
       })
       .expect(409);
     await owner
       .post(`/v1/customers/${customerId}/beneficiaries`, {
-        name: 'Full number',
+        name: 'Short number',
         bankName: 'Demo Bank',
-        accountLast4: '123456789',
+        accountNumber: '4321',
       })
       .expect(422);
 
@@ -110,7 +110,7 @@ describe('DMT beneficiaries', () => {
           details: {
             beneficiaryName: 'Anil Kumar',
             bankName: 'Demo Bank',
-            accountLast4: '4321',
+            accountNumber: '501002345674321',
             transferMode: 'IMPS',
           },
         }),
@@ -139,7 +139,7 @@ describe('DMT beneficiaries', () => {
       .post(`/v1/customers/${customerId}/beneficiaries`, {
         name: 'X Y',
         bankName: 'Bank',
-        accountLast4: '1111',
+        accountNumber: '111122223333',
       })
       .expect(404);
   });

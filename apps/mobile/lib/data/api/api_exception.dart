@@ -18,7 +18,7 @@ class ApiException implements Exception {
   final int? status;
   final String? requestId;
 
-  /// Field-level messages keyed by dotted path, e.g. `details.accountLast4`.
+  /// Field-level messages keyed by dotted path, e.g. `details.accountNumber`.
   final Map<String, List<String>> fields;
   final Map<String, Object?> details;
 

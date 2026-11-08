@@ -76,7 +76,10 @@ const L = {
 
   // validation messages
   'msg.mobile': ['Enter a 10-digit mobile number', '10 अंकों का मोबाइल नंबर दर्ज करें'],
-  'msg.last4': ['Enter only the last 4 digits', 'केवल अंतिम 4 अंक दर्ज करें'],
+  'msg.accountNumber': [
+    'Enter the full account number (9–18 digits)',
+    'पूरी खाता संख्या दर्ज करें (9–18 अंक)',
+  ],
   'msg.ifsc': ['Enter a valid IFSC (e.g. SBIN0001234)', 'सही IFSC दर्ज करें (जैसे SBIN0001234)'],
   'msg.date': ['Enter a valid date', 'सही तारीख दर्ज करें'],
   'msg.email': ['Enter a valid email address', 'सही ईमेल पता दर्ज करें'],

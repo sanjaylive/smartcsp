@@ -16,7 +16,7 @@
   "mobile.common.apply": "Apply",
   "mobile.common.loadMore": "Load more",
   "validation.phone": "Enter a 10-digit mobile number",
-  "validation.last4": "Enter only the last 4 digits",
+  "validation.accountNumber": "Enter the full account number (9–18 digits)",
   "validation.ifsc": "Invalid IFSC (e.g. SBIN0001234)",
   "validation.date": "Use YYYY-MM-DD",
   "validation.maxLength": "Use at most {max} characters",

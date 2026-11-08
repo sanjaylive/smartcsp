@@ -40,7 +40,7 @@ RecordDraftData _data({String walkIn = 'Ramesh'}) => RecordDraftData(
       principalPaise: 500000,
       customerFeePaise: 2000,
       amountCollectedPaise: 502000,
-      details: const {'beneficiaryName': 'Sita', 'bankName': 'Demo Bank', 'accountLast4': '1234'},
+      details: const {'beneficiaryName': 'Sita', 'bankName': 'Demo Bank', 'accountNumber': '123456789012'},
     );
 
 void main() {
@@ -97,14 +97,14 @@ void main() {
       code: 'VALIDATION_FAILED',
       message: 'Validation failed',
       status: 422,
-      fields: {'details.accountLast4': ['Enter only the last 4 digits']},
+      fields: {'details.accountNumber': ['Enter the full account number (9–18 digits)']},
     ));
     final r = await queue.runOnce();
     expect(r.failed, 1);
     final f = (await store.get(d.localId))!;
     expect(f.state, DraftState.failed);
     expect(f.lastErrorCode, 'VALIDATION_FAILED');
-    expect(f.fieldErrors['details.accountLast4'], ['Enter only the last 4 digits']);
+    expect(f.fieldErrors['details.accountNumber'], ['Enter the full account number (9–18 digits)']);
     expect(queue.failedCount, 1);
 
     // A FAILED draft is not retried automatically.

@@ -312,8 +312,6 @@ class _RecordDetailBodyState extends ConsumerState<_RecordDetailBody> {
         return formatDate('$v');
       case FieldType.boolean:
         return v == true ? s.t('common.yes') : s.t('common.no');
-      case FieldType.last4:
-        return 'XXXX $v';
       case FieldType.checklist:
         if (v is! List) return '';
         return v.map(ChecklistItem.fromJson).map((i) => '${i.done ? '☑' : '☐'} ${i.label}').join('\n');

@@ -229,7 +229,7 @@ export const en = {
   'field.senderMobile': 'Sender mobile',
   'field.beneficiaryName': 'Beneficiary name',
   'field.bankName': 'Bank name',
-  'field.accountLast4': 'Account number — last 4 digits',
+  'field.accountNumber': 'Account number',
   'field.ifsc': 'IFSC',
   'field.transferMode': 'Transfer mode',
   'field.billCategory': 'Bill category',
@@ -253,14 +253,7 @@ export const en = {
   'field.terminalRef': 'Terminal / provider reference',
   'field.productLabel': 'Account type / product',
   'field.applicationRef': 'Application reference',
-  'help.accountLast4': 'Only the last 4 digits are stored.',
   'help.noAadhaarNumber': 'Never enter an Aadhaar number here.',
-  'notice.dmt':
-    'Record only the details you need. Store just the last 4 digits of the account number.',
-  'notice.aadhaar':
-    'Do not record Aadhaar numbers, biometrics or copies of identity documents. Only the request type and reference are stored.',
-  'notice.aeps': 'Never record biometric data, PINs or authentication details.',
-  'notice.microatm': 'Never record card numbers, CVV, PIN or card data.',
 
   // options
   'option.rechargeType.PREPAID': 'Mobile prepaid',
@@ -542,7 +535,7 @@ export const en = {
   'landing.screen.service': 'Service',
   'landing.screen.amount': 'Amount',
   'landing.screen.mobile': 'Customer mobile',
-  'landing.screen.account': 'Account (last 4)',
+  'landing.screen.account': 'Account number',
   'landing.screen.save': 'Save record',
   'landing.screen.expense': 'Shop expense',
   'landing.screen.expectedInDrawer': 'Expected in drawer',

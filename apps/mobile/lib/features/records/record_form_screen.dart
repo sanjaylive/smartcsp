@@ -31,7 +31,6 @@ class ResolvedService {
     required this.fields,
     required this.direction,
     this.principalLabelKey,
-    this.noticeKey,
     this.customServiceId,
     this.customName,
     this.defaultFeePaise = 0,
@@ -42,7 +41,6 @@ class ResolvedService {
   final List<FieldDef> fields;
   final PrincipalDirection Function(Map<String, Object?>) direction;
   final String? principalLabelKey;
-  final String? noticeKey;
   final String? customServiceId;
   final String? customName;
   final int defaultFeePaise;
@@ -74,7 +72,6 @@ class ResolvedService {
       fields: def.fields,
       direction: def.direction,
       principalLabelKey: def.principalLabelKey,
-      noticeKey: def.noticeKey,
     );
   }
 }
@@ -200,7 +197,7 @@ class _RecordFormState extends ConsumerState<RecordForm> {
   }
 
   bool _isTextLike(FieldType t) =>
-      t == FieldType.text || t == FieldType.number || t == FieldType.phone || t == FieldType.last4 || t == FieldType.ifsc;
+      t == FieldType.text || t == FieldType.number || t == FieldType.phone || t == FieldType.account || t == FieldType.ifsc;
 
   List<String> get _statusOptions => initialStatuses(svc.workflow).where((s) => s != 'DRAFT').toList();
 
@@ -416,10 +413,6 @@ class _RecordFormState extends ConsumerState<RecordForm> {
             ],
             if (!online && !isDraftEdit) ...[
               InfoBanner(text: s.t('mobile.record.offlineNotice'), tone: BannerTone.warning, icon: Icons.wifi_off_rounded),
-              const SizedBox(height: Tokens.s2),
-            ],
-            if (svc.noticeKey != null) ...[
-              InfoBanner(text: s.t(svc.noticeKey!), tone: BannerTone.danger, icon: Icons.privacy_tip_outlined),
               const SizedBox(height: Tokens.s2),
             ],
             InfoBanner(text: s.t('record.manualNotice')),
@@ -692,15 +685,15 @@ class _RecordFormState extends ConsumerState<RecordForm> {
           onChanged: changed,
           decoration: InputDecoration(labelText: label, helperText: help, errorText: error, counterText: '', prefixText: '+91 '),
         );
-      case FieldType.last4:
+      case FieldType.account:
         return TextField(
           key: key,
           controller: _text[f.key],
           keyboardType: TextInputType.number,
-          maxLength: 4,
+          maxLength: 18,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           onChanged: changed,
-          decoration: InputDecoration(labelText: label, helperText: help, errorText: error, prefixText: 'XXXX XXXX ', counterText: ''),
+          decoration: InputDecoration(labelText: label, helperText: help, errorText: error, counterText: ''),
         );
       case FieldType.ifsc:
         return TextField(

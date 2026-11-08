@@ -93,7 +93,7 @@ void main() {
       principalPaise: 500050,
       customerFeePaise: 2000,
       amountCollectedPaise: 502050,
-      details: const {'beneficiaryName': 'Sita Devi', 'bankName': 'Demo Gramin Bank', 'accountLast4': '4321', 'ifsc': 'SBIN0001234', 'senderMobile': '9876543210'},
+      details: const {'beneficiaryName': 'Sita Devi', 'bankName': 'Demo Gramin Bank', 'accountNumber': '501002345674321', 'ifsc': 'SBIN0001234', 'senderMobile': '9876543210'},
       post: true,
     );
     final preview = await api.postingPreview(data);
@@ -126,7 +126,7 @@ void main() {
       serviceCode: 'DMT',
       txnDate: todayIso(),
       opStatus: 'SUCCESSFUL',
-      details: const {'beneficiaryName': 'X', 'bankName': 'Y', 'accountLast4': '12345'},
+      details: const {'beneficiaryName': 'X', 'bankName': 'Y', 'accountNumber': '12345'},
     ));
     await queue.runOnce();
     final failed = (await drafts.get(bad.localId))!;

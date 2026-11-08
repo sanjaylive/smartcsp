@@ -123,7 +123,7 @@ Map<String, Object?> recordJson({int no = 101, bool duplicate = false, String id
       'amountAllocatedPaise': 0,
       'amountDuePaise': 0,
       'receivablePaise': 502000,
-      'details': {'beneficiaryName': 'Sita', 'bankName': 'Demo Bank', 'accountLast4': '1234'},
+      'details': {'beneficiaryName': 'Sita', 'bankName': 'Demo Bank', 'accountNumber': '123456789012'},
       'source': 'MOBILE_SYNC',
       'isManual': true,
       'opStatus': 'SUCCESSFUL',

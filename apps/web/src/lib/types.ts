@@ -280,7 +280,7 @@ export interface Beneficiary {
   customerId: string;
   name: string;
   bankName: string;
-  accountLast4: string;
+  accountNumber: string;
   ifsc: string | null;
   active: boolean;
   lastUsedAt: string | null;

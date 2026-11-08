@@ -79,18 +79,17 @@ void main() {
     await pumpForm(tester, adapter);
 
     expect(find.text('New Money Transfer (DMT) record'), findsOneWidget);
-    expect(find.text('Record only the details you need. Store just the last 4 digits of the account number.'), findsOneWidget);
     expect(find.byKey(const Key('field.beneficiaryName')), findsOneWidget);
-    expect(find.byKey(const Key('field.accountLast4')), findsOneWidget);
+    expect(find.byKey(const Key('field.accountNumber')), findsOneWidget);
     expect(find.byKey(const Key('field.ifsc')), findsOneWidget);
 
     await tester.enterText(find.byKey(const Key('field.senderName')), 'Ram ${_aadhaarLike()}');
-    await tester.enterText(find.byKey(const Key('field.accountLast4')), '12');
+    await tester.enterText(find.byKey(const Key('field.accountNumber')), '12');
     await tester.tap(find.byKey(const Key('record.save')));
     await pumpFor(tester);
 
     expect(find.text('Do not enter Aadhaar numbers. CSP2All does not store them.'), findsOneWidget);
-    expect(find.text('Enter only the last 4 digits'), findsOneWidget);
+    expect(find.text('Enter the full account number (9–18 digits)'), findsOneWidget);
     expect(find.text('Required'), findsNWidgets(2)); // beneficiary + bank
     expect(adapter.to('POST', '/v1/records'), isEmpty);
     await tester.pumpWidget(const SizedBox());
@@ -103,7 +102,7 @@ void main() {
     await tester.enterText(find.byKey(const Key('record.walkIn')), 'Ramesh');
     await tester.enterText(find.byKey(const Key('field.beneficiaryName')), 'Sita Devi');
     await tester.enterText(find.byKey(const Key('field.bankName')), 'Demo Gramin Bank');
-    await tester.enterText(find.byKey(const Key('field.accountLast4')), '4321');
+    await tester.enterText(find.byKey(const Key('field.accountNumber')), '501002345674321');
     await tester.enterText(find.byKey(const Key('field.ifsc')), 'sbin0001234');
     await tester.enterText(find.byKey(const Key('record.principalPaise')), '5,000.50');
     await tester.enterText(find.byKey(const Key('record.customerFeePaise')), '20');
@@ -123,7 +122,7 @@ void main() {
     expect(body['amountCollectedPaise'], 502050);
     expect(body['opStatus'], 'SUCCESSFUL');
     expect(body['walkInName'], 'Ramesh');
-    expect(body['details'], {'beneficiaryName': 'Sita Devi', 'bankName': 'Demo Gramin Bank', 'accountLast4': '4321', 'ifsc': 'SBIN0001234'});
+    expect(body['details'], {'beneficiaryName': 'Sita Devi', 'bankName': 'Demo Gramin Bank', 'accountNumber': '501002345674321', 'ifsc': 'SBIN0001234'});
     expect((body['clientRef'] as String).length, greaterThanOrEqualTo(8));
     expect(posts.single.headers['Idempotency-Key'], isNotEmpty);
     expect(find.text('detail rec-101'), findsOneWidget);
@@ -136,7 +135,7 @@ void main() {
 
     await tester.enterText(find.byKey(const Key('field.beneficiaryName')), 'Sita');
     await tester.enterText(find.byKey(const Key('field.bankName')), 'Demo Bank');
-    await tester.enterText(find.byKey(const Key('field.accountLast4')), '1234');
+    await tester.enterText(find.byKey(const Key('field.accountNumber')), '123456789012');
     await tester.enterText(find.byKey(const Key('record.customerFeePaise')), '10');
     await tester.tap(find.byKey(const Key('record.save')));
     await pumpFor(tester, 20);
@@ -152,7 +151,6 @@ void main() {
 
   testWidgets('Hindi: labels and validation messages are translated', (tester) async {
     await pumpForm(tester, _server(), service: 'AEPS', lang: 'hi');
-    expect(find.text(stringsHi['notice.aeps']!), findsOneWidget);
     expect(find.text(stringsHi['record.manualNotice']!), findsOneWidget);
     expect(find.text(stringsHi['mobile.record.save']!), findsOneWidget);
     await tester.tap(find.byKey(const Key('record.save')));

@@ -185,7 +185,7 @@ export function dmtRecord(overrides: Record<string, unknown> = {}) {
     details: {
       beneficiaryName: 'Anil Kumar',
       bankName: 'Demo Bank',
-      accountLast4: '4321',
+      accountNumber: '501002345674321',
       transferMode: 'IMPS',
     },
     post: true,

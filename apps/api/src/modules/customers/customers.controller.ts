@@ -64,7 +64,7 @@ function beneficiaryJson(b: Beneficiary) {
     customerId: b.customerId,
     name: b.name,
     bankName: b.bankName,
-    accountLast4: b.accountLast4,
+    accountNumber: b.accountNumber,
     ifsc: b.ifsc,
     active: b.active,
     lastUsedAt: b.lastUsedAt,
@@ -482,7 +482,7 @@ export class CustomersController {
             customerId: id,
             name: dto.name,
             bankName: dto.bankName,
-            accountLast4: dto.accountLast4,
+            accountNumber: dto.accountNumber,
             ifsc: dto.ifsc ?? null,
             createdByUserId: ctx.userId,
           },
@@ -490,7 +490,7 @@ export class CustomersController {
         .catch((e: unknown) => {
           if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002')
             throw new AppError('CONFLICT', 'This beneficiary is already saved', undefined, {
-              accountLast4: ['This beneficiary is already saved'],
+              accountNumber: ['This beneficiary is already saved'],
             });
           throw e;
         });
@@ -524,7 +524,7 @@ export class CustomersController {
         data: {
           name: dto.name,
           bankName: dto.bankName,
-          accountLast4: dto.accountLast4,
+          accountNumber: dto.accountNumber,
           ifsc: dto.ifsc,
           active: dto.active,
           version: { increment: 1 },

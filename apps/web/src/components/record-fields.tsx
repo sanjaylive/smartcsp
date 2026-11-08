@@ -188,14 +188,14 @@ export function DetailField({
                 onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
               />
             );
-          case 'last4':
+          case 'account':
             return (
               <Input
                 {...common}
                 inputMode="numeric"
-                maxLength={4}
+                maxLength={18}
                 autoComplete="off"
-                className="money max-w-32"
+                className="money max-w-64"
                 value={str}
                 onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
               />

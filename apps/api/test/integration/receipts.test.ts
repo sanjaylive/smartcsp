@@ -49,9 +49,9 @@ describe('Customer receipts', () => {
       paidPaise: 250000,
       duePaise: 3000,
     });
-    // Account numbers only ever as last 4; sender mobile (sensitive) is left out.
+    // The full account number is printed; sender mobile (sensitive) is left out.
     const values = r.details.map((d: { value: string }) => d.value).join(' ');
-    expect(values).toContain('••••4321');
+    expect(values).toContain('501002345674321');
     expect(r.text).toContain('Balance due');
     expect(r.text).toContain('TXN12345');
     expect(r).toMatchObject({ canEmailCustomer: true, canMessageCustomer: true });

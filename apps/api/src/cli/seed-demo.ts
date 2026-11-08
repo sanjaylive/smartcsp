@@ -193,7 +193,7 @@ async function main() {
     details: {
       beneficiaryName: 'Rakesh (fictional)',
       bankName: 'Demo Bank',
-      accountLast4: '4821',
+      accountNumber: '50100234574821',
       transferMode: 'IMPS',
     },
   });

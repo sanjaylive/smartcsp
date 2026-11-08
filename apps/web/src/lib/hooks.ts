@@ -69,7 +69,7 @@ export function zodToFieldErrors(err: ZodError, prefix = ''): FieldErrors {
 const KNOWN_MESSAGES: Record<string, string> = {
   Required: 'common.required',
   'Enter a 10-digit mobile number': 'msg.mobile',
-  'Enter only the last 4 digits': 'msg.last4',
+  'Enter the full account number (9–18 digits)': 'msg.accountNumber',
   'Invalid IFSC': 'msg.ifsc',
   'Use YYYY-MM-DD': 'msg.date',
   'Enter a valid email address': 'msg.email',

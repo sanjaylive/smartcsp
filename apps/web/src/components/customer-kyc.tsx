@@ -453,7 +453,7 @@ export function BeneficiariesCard({ customerId }: { customerId: string }) {
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold">{b.name}</span>
                 <span className="block truncate text-xs text-fg-muted">
-                  {b.bankName} · ••{b.accountLast4}
+                  {b.bankName} · {b.accountNumber}
                   {b.ifsc ? ` · ${b.ifsc}` : ''}
                 </span>
               </span>
@@ -477,7 +477,7 @@ function BeneficiaryDrawer({ customerId, onClose }: { customerId: string; onClos
   const { t } = useI18n();
   const qc = useQueryClient();
   const errs = useFormErrors();
-  const [f, setF] = useState({ name: '', bankName: '', accountLast4: '', ifsc: '' });
+  const [f, setF] = useState({ name: '', bankName: '', accountNumber: '', ifsc: '' });
   const [busy, setBusy] = useState(false);
   const save = async () => {
     errs.clear();
@@ -523,7 +523,6 @@ function BeneficiaryDrawer({ customerId, onClose }: { customerId: string; onClos
       open
       onOpenChange={(o) => !o && onClose()}
       title="Add beneficiary"
-      description="Only the last 4 digits of the account number are kept."
       icon={
         <span className="grid size-10 place-items-center rounded-xl bg-brand-bg text-brand">
           <Landmark aria-hidden className="size-5" />
@@ -543,10 +542,11 @@ function BeneficiaryDrawer({ customerId, onClose }: { customerId: string; onClos
       <div className="flex flex-col gap-4">
         {input('name', 'Beneficiary name', { maxLength: 80 })}
         {input('bankName', 'Bank name', { maxLength: 80 })}
-        {input('accountLast4', 'Account number — last 4 digits', {
-          maxLength: 4,
+        {input('accountNumber', 'Account number', {
+          maxLength: 18,
           inputMode: 'numeric',
-          className: 'money tracking-[0.3em]',
+          autoComplete: 'off',
+          className: 'money',
         })}
         {input('ifsc', 'IFSC', { maxLength: 11, className: 'uppercase' }, false)}
         {errs.formMessage && !Object.keys(errs.fields).length ? (

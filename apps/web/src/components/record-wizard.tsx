@@ -90,7 +90,6 @@ export interface Resolved {
   fields: FieldDef[];
   direction: (d: Record<string, unknown>) => PrincipalDirection;
   principalLabelKey: string | null;
-  noticeKey?: string;
   defaultFeePaise: number;
 }
 
@@ -124,7 +123,6 @@ export function resolveService(
     fields: def.fields,
     direction: def.principalDirection,
     principalLabelKey: def.principalLabelKey,
-    noticeKey: def.noticeKey,
     defaultFeePaise: 0,
   };
 }
@@ -356,7 +354,7 @@ function ServiceGrid({
 /* ----------------------------------------------------------------------------- the steps */
 
 type StepKey = 'customer' | 'details' | 'beneficiary' | 'amount' | 'review';
-const BENEFICIARY_KEYS = ['beneficiaryName', 'bankName', 'accountLast4', 'ifsc'];
+const BENEFICIARY_KEYS = ['beneficiaryName', 'bankName', 'accountNumber', 'ifsc'];
 const AMOUNT_KEYS = [
   'principalPaise',
   'customerFeePaise',
@@ -471,7 +469,7 @@ function RecordSteps({
       ...d,
       beneficiaryName: b === 'new' ? '' : b.name,
       bankName: b === 'new' ? '' : b.bankName,
-      accountLast4: b === 'new' ? '' : b.accountLast4,
+      accountNumber: b === 'new' ? '' : b.accountNumber,
       ifsc: b === 'new' ? '' : (b.ifsc ?? ''),
     }));
   };
@@ -639,7 +637,7 @@ function RecordSteps({
         const b = beneficiaryCreateSchema.safeParse({
           name: detailsObj.beneficiaryName,
           bankName: detailsObj.bankName,
-          accountLast4: detailsObj.accountLast4,
+          accountNumber: detailsObj.accountNumber,
           ifsc: detailsObj.ifsc || null,
         });
         if (b.success)
@@ -833,7 +831,6 @@ function RecordSteps({
                   : 'What was done on the portal or device.'
               }
             />
-            {svc.noticeKey ? <Alert tone="warning">{tk(svc.noticeKey)}</Alert> : null}
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
                 label={
@@ -948,7 +945,7 @@ function RecordSteps({
             <StepIntro
               icon={Landmark}
               title="Who receives the money?"
-              text="Pick a saved beneficiary or add a new one. Only the last 4 digits of the account are kept."
+              text="Pick a saved beneficiary or add a new one."
             />
             {customerId ? (
               <div role="radiogroup" aria-label="Beneficiary" className="grid gap-2 sm:grid-cols-2">
@@ -960,7 +957,7 @@ function RecordSteps({
                   >
                     <span className="block font-semibold">{b.name}</span>
                     <span className="block text-xs text-fg-muted">
-                      {b.bankName} · ••{b.accountLast4}
+                      {b.bankName} · {b.accountNumber}
                       {b.ifsc ? ` · ${b.ifsc}` : ''}
                     </span>
                   </BenCard>
@@ -1169,7 +1166,7 @@ function RecordSteps({
                   onEdit={() => setStepIdx(steps.findIndex((s) => s.key === 'beneficiary'))}
                 >
                   {String(detailsObj.beneficiaryName ?? '—')} · {String(detailsObj.bankName ?? '')}{' '}
-                  ••{String(detailsObj.accountLast4 ?? '')}
+                  {String(detailsObj.accountNumber ?? '')}
                 </ReviewRow>
               ) : null}
               <ReviewRow label={t('common.status')} onEdit={() => setStepIdx(1)}>

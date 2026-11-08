@@ -3,7 +3,7 @@
 // validation error, never bad data.
 import 'package:flutter/material.dart';
 
-enum FieldType { text, number, date, select, phone, last4, ifsc, checklist, boolean }
+enum FieldType { text, number, date, select, phone, account, ifsc, checklist, boolean }
 
 enum WorkflowType { transaction, application }
 
@@ -74,7 +74,6 @@ class ServiceDefinition {
     required this.direction,
     required this.dashboardWidgets,
     required this.providerCapable,
-    this.noticeKey,
   });
 
   final String code;
@@ -89,7 +88,6 @@ class ServiceDefinition {
   final PrincipalDirection Function(Map<String, Object?> details) direction;
   final List<String> dashboardWidgets;
   final bool providerCapable;
-  final String? noticeKey;
 
   String get labelKey => 'service.$code.name';
   String get descriptionKey => 'service.$code.description';
@@ -167,14 +165,13 @@ final Map<String, ServiceDefinition> serviceRegistry = {
       const FieldDef(key: 'senderMobile', type: FieldType.phone, labelKey: 'field.senderMobile', sensitive: true),
       const FieldDef(key: 'beneficiaryName', type: FieldType.text, labelKey: 'field.beneficiaryName', required: true, maxLength: 80, guardSensitive: true),
       const FieldDef(key: 'bankName', type: FieldType.text, labelKey: 'field.bankName', required: true, maxLength: 80),
-      const FieldDef(key: 'accountLast4', type: FieldType.last4, labelKey: 'field.accountLast4', required: true, helpKey: 'help.accountLast4'),
+      const FieldDef(key: 'accountNumber', type: FieldType.account, labelKey: 'field.accountNumber', required: true),
       const FieldDef(key: 'ifsc', type: FieldType.ifsc, labelKey: 'field.ifsc'),
       FieldDef(key: 'transferMode', type: FieldType.select, labelKey: 'field.transferMode', options: _opt(['IMPS', 'NEFT', 'UPI'], 'option.transferMode')),
     ],
     direction: _collect,
     dashboardWidgets: const ['volume', 'cashCollected'],
     providerCapable: true,
-    noticeKey: 'notice.dmt',
   ),
   'BILL_PAYMENT': ServiceDefinition(
     code: 'BILL_PAYMENT',
@@ -253,7 +250,6 @@ final Map<String, ServiceDefinition> serviceRegistry = {
     direction: _none,
     dashboardWidgets: const ['pendingApplications'],
     providerCapable: false,
-    noticeKey: 'notice.aadhaar',
   ),
   'DOCUMENT': ServiceDefinition(
     code: 'DOCUMENT',
@@ -306,7 +302,6 @@ final Map<String, ServiceDefinition> serviceRegistry = {
     direction: _opDirection,
     dashboardWidgets: const ['volume', 'cashPayout'],
     providerCapable: true,
-    noticeKey: 'notice.aeps',
   ),
   'MICRO_ATM': ServiceDefinition(
     code: 'MICRO_ATM',
@@ -323,7 +318,6 @@ final Map<String, ServiceDefinition> serviceRegistry = {
     direction: _opDirection,
     dashboardWidgets: const ['volume', 'cashPayout'],
     providerCapable: true,
-    noticeKey: 'notice.microatm',
   ),
   'ACCOUNT_OPENING': ServiceDefinition(
     code: 'ACCOUNT_OPENING',
@@ -338,7 +332,7 @@ final Map<String, ServiceDefinition> serviceRegistry = {
       FieldDef(key: 'applicantName', type: FieldType.text, labelKey: 'field.applicantName', required: true, maxLength: 80, guardSensitive: true),
       FieldDef(key: 'applicationRef', type: FieldType.text, labelKey: 'field.applicationRef', maxLength: 40),
       FieldDef(key: 'submittedOn', type: FieldType.date, labelKey: 'field.submittedOn'),
-      FieldDef(key: 'accountLast4', type: FieldType.last4, labelKey: 'field.accountLast4', helpKey: 'help.accountLast4'),
+      FieldDef(key: 'accountNumber', type: FieldType.account, labelKey: 'field.accountNumber'),
     ],
     direction: _none,
     dashboardWidgets: const ['pendingApplications'],

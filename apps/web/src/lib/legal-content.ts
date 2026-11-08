@@ -168,7 +168,7 @@ export const PRIVACY: LegalDoc = {
           list: [
             'Account details: your name, mobile number, email, shop name and address, and staff you add.',
             'Records you enter: services, amounts, fees, cashbook entries, dues, and customer names and mobile numbers.',
-            'Masked identifiers in records: the last 4 digits of an Aadhaar or account number. Full numbers typed into forms, PINs, OTPs and biometrics are rejected and never stored.',
+            'Money-transfer details: beneficiary name, bank, account number and IFSC, as entered by the shop. Aadhaar and card numbers, PINs, OTPs and biometrics are rejected and never stored.',
             'Customer KYC: KYC status, ID type and the last 4 characters of the ID number, and — only if the shop uploads them — photos of ID documents. Shops are asked to upload masked Aadhaar copies. ID photos can be opened only by staff the shop has allowed to see sensitive customer data, through short-lived links, and every access is logged.',
             'Billing details: plan, invoices and payment status. Card and UPI details are handled by our payment partner, not by us.',
             'Technical data: device and browser type, IP address, app version and error logs, used for security and to fix problems.',

@@ -70,7 +70,7 @@ describe('Core workflow for every service', () => {
         details: {
           beneficiaryName: 'Anil',
           bankName: 'Demo Bank',
-          accountLast4: '1234',
+          accountNumber: '123456789012',
           ifsc: 'demo0001234',
         },
       },
@@ -156,7 +156,7 @@ describe('Core workflow for every service', () => {
         opStatus: 'SUBMITTED',
         customerFeePaise: 0,
         expectedCommissionPaise: 5000,
-        details: { bankLabel: 'Demo Bank', applicantName: 'Ravi', accountLast4: '9876' },
+        details: { bankLabel: 'Demo Bank', applicantName: 'Ravi', accountNumber: '30987654329876' },
       },
     ],
   ];
@@ -251,12 +251,12 @@ describe('Validation and privacy', () => {
   it('accepts a 12-digit bank RRN as an external reference', async () => {
     await c.post('/v1/records', aepsRecord({ externalRef: '234123412346' })).expect(201);
   });
-  it('requires full-account details to be only the last 4 digits', async () => {
+  it('requires the full account number, not just the last 4 digits', async () => {
     await c
       .post(
         '/v1/records',
         dmtRecord({
-          details: { beneficiaryName: 'A', bankName: 'B', accountLast4: '123456789012' },
+          details: { beneficiaryName: 'A', bankName: 'B', accountNumber: '9012' },
         }),
       )
       .expect(422);
