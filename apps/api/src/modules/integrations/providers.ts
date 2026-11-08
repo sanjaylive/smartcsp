@@ -32,6 +32,16 @@ export interface WebhookVerification {
   reason?: string;
 }
 
+export interface AccountVerifyRequest {
+  accountNumber: string;
+  ifsc: string;
+}
+
+/** Name lookup for a bank account (no money moves). */
+export type AccountVerifyResult =
+  | { status: 'VERIFIED'; name: string; providerRef?: string }
+  | { status: 'NOT_FOUND'; message?: string };
+
 /** Raised when a call's outcome cannot be known (timeout, connection reset after send, 5xx). */
 export class OutcomeUnknownError extends Error {}
 
@@ -49,6 +59,8 @@ export interface ProviderAdapter {
   health(): Promise<{ ok: boolean; detail: string }>;
   execute(req: ExecuteRequest, timeoutMs: number): Promise<ExecuteResult>;
   queryStatus(idempotencyKey: string): Promise<StatusResult>;
+  /** Look up the account holder's name before a transfer. */
+  verifyAccount(req: AccountVerifyRequest, timeoutMs: number): Promise<AccountVerifyResult>;
   verifyWebhook(
     rawBody: Buffer,
     headers: Record<string, string | string[] | undefined>,
@@ -92,6 +104,9 @@ export class Pay2AllAdapter implements ProviderAdapter {
     this.unavailable();
   }
   async queryStatus(): Promise<StatusResult> {
+    this.unavailable();
+  }
+  async verifyAccount(): Promise<AccountVerifyResult> {
     this.unavailable();
   }
   verifyWebhook(): WebhookVerification {
@@ -171,6 +186,24 @@ export class SimulatorAdapter implements ProviderAdapter {
       await this.save(idempotencyKey, s);
     }
     return { status: s.status, providerRef: s.providerRef };
+  }
+
+  /**
+   * Simulated account lookup: account numbers ending in 000 are "not found"; any other number maps
+   * to a stable made-up name so the same account always verifies to the same holder.
+   */
+  async verifyAccount(req: AccountVerifyRequest): Promise<AccountVerifyResult> {
+    await new Promise((r) => setTimeout(r, 300));
+    if (req.accountNumber.endsWith('000'))
+      return { status: 'NOT_FOUND', message: 'No account found for this number and IFSC' };
+    const first = ['ANIL', 'SITA', 'RAMESH', 'GEETA', 'MOHAN', 'PRIYA', 'SURESH', 'KAVITA'];
+    const last = ['KUMAR', 'DEVI', 'SHARMA', 'YADAV', 'SINGH', 'VERMA', 'GUPTA', 'PATEL'];
+    const n = [...req.accountNumber].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 9973, 7);
+    return {
+      status: 'VERIFIED',
+      name: `${first[n % first.length]} ${last[Math.floor(n / first.length) % last.length]}`,
+      providerRef: `SIMV${req.accountNumber.slice(-4)}`,
+    };
   }
 
   /** Simulator webhook signature: header `x-sim-signature: t=<unix>,v1=<hex hmac(secret, t + "." + rawBody)>`. */

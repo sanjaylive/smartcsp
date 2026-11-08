@@ -722,6 +722,77 @@
             "bearerAuth": []
           }
         ]
+      },
+      "patch": {
+        "summary": "Update your own name or preferred language",
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "Auth_updateMe",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "locale": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "hi"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/v1/auth/select-tenant": {
@@ -7217,6 +7288,18 @@
             }
           },
           {
+            "name": "unread",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
             "name": "X-Request-Id",
             "in": "header",
             "required": false,
@@ -8111,6 +8194,132 @@
         ],
         "x-permissions": [
           "integrations.manage"
+        ]
+      }
+    },
+    "/v1/beneficiaries/verify": {
+      "get": {
+        "summary": "Whether beneficiary account names can be verified through the connected provider",
+        "tags": [
+          "Integrations"
+        ],
+        "operationId": "Integrations_accountVerifyStatus",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "records.create"
+        ]
+      },
+      "post": {
+        "summary": "Look up a bank account holder's name before a transfer (no money moves)",
+        "tags": [
+          "Integrations"
+        ],
+        "operationId": "Integrations_verifyAccount",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "accountNumber": {
+                    "type": "string"
+                  },
+                  "ifsc": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "accountNumber",
+                  "ifsc"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "records.create"
         ]
       }
     },

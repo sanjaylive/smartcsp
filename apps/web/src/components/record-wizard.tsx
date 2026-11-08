@@ -40,6 +40,8 @@ import {
   type WorkflowType,
 } from '@csp2all/shared';
 import { api, isApiError } from '@/lib/api';
+import { BankIcon, BeneficiaryForm } from '@/components/beneficiary-form';
+import { bankByName, bankForIfsc } from '@/lib/banks';
 import { useI18n } from '@/lib/i18n';
 import {
   useFormErrors,
@@ -354,7 +356,7 @@ function ServiceGrid({
 /* ----------------------------------------------------------------------------- the steps */
 
 type StepKey = 'customer' | 'details' | 'beneficiary' | 'amount' | 'review';
-const BENEFICIARY_KEYS = ['beneficiaryName', 'bankName', 'accountNumber', 'ifsc'];
+const BENEFICIARY_KEYS = ['accountNumber', 'ifsc', 'bankName', 'beneficiaryName'];
 const AMOUNT_KEYS = [
   'principalPaise',
   'customerFeePaise',
@@ -421,7 +423,7 @@ function RecordSteps({
   const [post, setPost] = useState(canPost);
   const [busy, setBusy] = useState(false);
   const [beneficiaryId, setBeneficiaryId] = useState<string | 'new' | null>(null);
-  const [saveBeneficiary, setSaveBeneficiary] = useState(true);
+  const [addingBen, setAddingBen] = useState(false);
   const [kycOpen, setKycOpen] = useState(false);
 
   const customerId = customer.kind === 'customer' ? customer.id : null;
@@ -627,13 +629,7 @@ function RecordSteps({
       });
       idem.reset();
       // Remember a new DMT beneficiary for next time (best effort; never blocks the record).
-      if (
-        isDmt &&
-        customerId &&
-        beneficiaryId === 'new' &&
-        saveBeneficiary &&
-        can('customers.manage')
-      ) {
+      if (isDmt && customerId && beneficiaryId === 'new' && can('customers.manage')) {
         const b = beneficiaryCreateSchema.safeParse({
           name: detailsObj.beneficiaryName,
           bankName: detailsObj.bankName,
@@ -660,6 +656,45 @@ function RecordSteps({
         if (err.status >= 400 && err.status < 500) idem.reset();
         jumpToErrors(err.fields ?? {});
       }
+    }
+  };
+
+  // Save the typed beneficiary to the customer now and select it.
+  const addBeneficiary = async () => {
+    if (!customerId) return;
+    const r = beneficiaryCreateSchema.safeParse({
+      name: detailsObj.beneficiaryName ?? '',
+      bankName: detailsObj.bankName ?? '',
+      accountNumber: detailsObj.accountNumber ?? '',
+      ifsc: detailsObj.ifsc || null,
+    });
+    const rename: Record<string, string> = { name: 'beneficiaryName' };
+    if (!r.success) {
+      const fe = zodToFieldErrors(r.error);
+      errs.setFields(
+        Object.fromEntries(Object.entries(fe).map(([k, v]) => [`details.${rename[k] ?? k}`, v])),
+      );
+      return;
+    }
+    setAddingBen(true);
+    try {
+      const b = await api<Beneficiary>(`/v1/customers/${customerId}/beneficiaries`, {
+        method: 'POST',
+        body: r.data,
+      });
+      await qc.invalidateQueries({ queryKey: ['customers', customerId, 'beneficiaries'] });
+      setBeneficiaryId(b.id);
+      toast('success', `${b.name} added`);
+    } catch (e) {
+      if (isApiError(e) && e.fields)
+        errs.setFields(
+          Object.fromEntries(
+            Object.entries(e.fields).map(([k, v]) => [`details.${rename[k] ?? k}`, v]),
+          ),
+        );
+      else errs.fromError(e);
+    } finally {
+      setAddingBen(false);
     }
   };
 
@@ -955,10 +990,17 @@ function RecordSteps({
                     on={beneficiaryId === b.id}
                     onClick={() => pickBeneficiary(b)}
                   >
-                    <span className="block font-semibold">{b.name}</span>
-                    <span className="block text-xs text-fg-muted">
-                      {b.bankName} · {b.accountNumber}
-                      {b.ifsc ? ` · ${b.ifsc}` : ''}
+                    <span className="flex items-center gap-3 pr-6">
+                      <BankIcon bank={bankForIfsc(b.ifsc ?? '') ?? bankByName(b.bankName)} />
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold">{b.name}</span>
+                        <span className="block truncate text-xs text-fg-muted">
+                          {b.bankName} · <span className="money">{b.accountNumber}</span>
+                        </span>
+                        {b.ifsc ? (
+                          <span className="block text-[11px] text-fg-muted">{b.ifsc}</span>
+                        ) : null}
+                      </span>
                     </span>
                   </BenCard>
                 ))}
@@ -976,17 +1018,29 @@ function RecordSteps({
               </p>
             )}
             {beneficiaryId === 'new' || !customerId ? (
-              <div className="grid gap-4 rounded-xl border border-border p-4 sm:grid-cols-2">
-                {BENEFICIARY_KEYS.map((k) => fieldFor(k))
-                  .filter((f): f is FieldDef => !!f)
-                  .map(renderDetail)}
+              <div className="flex flex-col gap-4 rounded-xl border border-border p-4">
+                <BeneficiaryForm
+                  value={{
+                    accountNumber: String(details.accountNumber ?? ''),
+                    ifsc: String(details.ifsc ?? ''),
+                    bankName: String(details.bankName ?? ''),
+                    beneficiaryName: String(details.beneficiaryName ?? ''),
+                  }}
+                  onChange={(patch) => {
+                    setDetails((d) => ({ ...d, ...patch }));
+                    for (const k of Object.keys(patch)) clearErr(`details.${k}`);
+                  }}
+                  error={(k) => errs.get(`details.${k}`) ?? undefined}
+                />
                 {customerId && can('customers.manage') ? (
-                  <div className="sm:col-span-2">
-                    <Checkbox
-                      checked={saveBeneficiary}
-                      onChange={setSaveBeneficiary}
-                      label="Save this beneficiary for the customer"
-                    />
+                  <div className="flex justify-end border-t border-border pt-3">
+                    <Button
+                      onClick={() => void addBeneficiary()}
+                      loading={addingBen}
+                      icon={<Plus aria-hidden className="size-4" />}
+                    >
+                      Add beneficiary
+                    </Button>
                   </div>
                 ) : null}
               </div>

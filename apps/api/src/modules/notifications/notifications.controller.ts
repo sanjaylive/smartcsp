@@ -8,6 +8,10 @@ import { ApiDoc, parse } from '../../common/http';
 import { notFound } from '../../common/errors';
 import { pageResult, paginate } from '../../common/serialize';
 
+const notificationsQuery = pagination.extend({
+  unread: z.enum(['true', 'false']).optional(),
+});
+
 const auditQuery = pagination.extend({
   action: z.string().max(60).optional(),
   targetId: z.string().max(60).optional(),
@@ -26,12 +30,13 @@ export class NotificationsController {
   @ApiDoc({
     summary: 'Notifications for the current user in this shop',
     tags: ['Notifications'],
-    query: pagination,
+    query: notificationsQuery,
   })
   list(@Ctx() ctx: TenantCtx, @Query() query: unknown) {
-    const q = parse(pagination, query);
+    const q = parse(notificationsQuery, query);
     return this.db.inTenant(ctx, async (tx) => {
-      const where = this.mine(ctx);
+      const mine = this.mine(ctx);
+      const where = q.unread === 'true' ? { ...mine, readAt: null } : mine;
       const [items, total, unread] = [
         await tx.notification.findMany({
           where,
@@ -39,7 +44,7 @@ export class NotificationsController {
           ...paginate(q.page, q.pageSize),
         }),
         await tx.notification.count({ where }),
-        await tx.notification.count({ where: { ...where, readAt: null } }),
+        await tx.notification.count({ where: { ...mine, readAt: null } }),
       ];
       return { ...pageResult(items, total, q.page, q.pageSize), unread };
     });

@@ -570,6 +570,22 @@ export const beneficiaryCreateSchema = z.object({
     .pipe(z.string().regex(/^\d{9,18}$/, 'Enter the full account number (9–18 digits)')),
   ifsc: ifscCode.optional().nullable(),
 });
+/** Look up the account holder's name with the shop's connected provider (penny-less name check). */
+export const accountVerifySchema = z.object({
+  accountNumber: beneficiaryCreateSchema.shape.accountNumber,
+  ifsc: ifscCode,
+});
+
 export const beneficiaryUpdateSchema = beneficiaryCreateSchema
   .partial()
   .extend({ version: z.number().int(), active: z.boolean().optional() });
+
+// ----------------------------------------------------------------------------- own profile
+export const profileUpdateSchema = z
+  .object({
+    displayName: safeText(60).pipe(z.string().min(2, 'Enter your name')).optional(),
+    locale: z.enum(['en', 'hi']).optional(),
+  })
+  .refine((v) => v.displayName !== undefined || v.locale !== undefined, {
+    message: 'Nothing to update',
+  });

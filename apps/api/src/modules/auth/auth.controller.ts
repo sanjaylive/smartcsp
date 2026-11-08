@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Req,
+  Res,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import {
   otpRequestSchema,
@@ -6,6 +17,7 @@ import {
   phoneRequestSchema,
   phoneVerifySchema,
   refreshSchema,
+  profileUpdateSchema,
   selectTenantSchema,
 } from '@csp2all/shared';
 import type { ErrorCode } from '@csp2all/shared';
@@ -249,6 +261,29 @@ export class AuthController {
   @UserAuth()
   @ApiDoc({ summary: 'Current user, shops and onboarding state', tags: ['Auth'] })
   async getMe(@Auth() auth: AuthState) {
+    return this.meService.get(auth.user.id, auth.session.activeTenantId);
+  }
+
+  @Patch('me')
+  @UserAuth()
+  @ApiDoc({
+    summary: 'Update your own name or preferred language',
+    tags: ['Auth'],
+    body: profileUpdateSchema,
+  })
+  async updateMe(@Body() body: unknown, @Auth() auth: AuthState, @Req() req: AppRequest) {
+    const dto = parse(profileUpdateSchema, body);
+    await this.db.user.update({
+      where: { id: auth.user.id },
+      data: { displayName: dto.displayName, locale: dto.locale },
+    });
+    await this.db.asSystem((tx) =>
+      this.audit.platform(
+        tx,
+        { userId: auth.user.id, actorType: 'USER', requestId: req.requestId },
+        { action: 'user.profile_updated', data: { fields: Object.keys(dto) } },
+      ),
+    );
     return this.meService.get(auth.user.id, auth.session.activeTenantId);
   }
 

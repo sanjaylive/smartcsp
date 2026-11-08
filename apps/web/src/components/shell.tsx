@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as RD from '@radix-ui/react-dialog';
 import * as DM from '@radix-ui/react-dropdown-menu';
 import {
@@ -21,7 +21,6 @@ import {
   Layers,
   ListChecks,
   LayoutDashboard,
-  LogOut,
   Menu,
   Plus,
   PlugZap,
@@ -47,6 +46,8 @@ import { ServiceIcon, useServiceLabel } from './service';
 import { Alert, Badge } from './ui';
 import { ErrorBlock, LoadingBlock } from './query-state';
 import { NewRecordLink } from '@/components/record-wizard';
+import { NotificationsDrawer } from './notifications-drawer';
+import { ProfileDrawer, initialsOf } from './profile-drawer';
 
 const NAV_ICONS: Record<string, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -262,59 +263,21 @@ function ShopSwitcher({ me, ctx }: { me: Me; ctx: TenantContext }) {
   );
 }
 
-function UserMenu({ me }: { me: Me }) {
+function AvatarButton({ me, onClick }: { me: Me; onClick: () => void }) {
   const { t } = useI18n();
-  const qc = useQueryClient();
-  const logout = async () => {
-    try {
-      await api('/v1/auth/logout', { method: 'POST', noAuthRedirect: true });
-    } finally {
-      qc.clear();
-      window.location.assign('/login');
-    }
-  };
   const identity = me.user.displayName ?? me.user.email ?? me.user.phone ?? '?';
-  const initial = identity.slice(0, 1).toUpperCase();
   return (
-    <DM.Root>
-      <DM.Trigger
-        className="flex size-9 items-center justify-center rounded-full hover:bg-surface-muted"
-        aria-label={t('shell.account')}
-      >
-        <span className="flex size-8 items-center justify-center rounded-full bg-brand-alt text-sm font-bold text-white dark:text-bg">
-          {initial}
-        </span>
-      </DM.Trigger>
-      <DM.Portal>
-        <DM.Content
-          align="end"
-          sideOffset={6}
-          className="z-50 min-w-60 rounded-xl border border-border bg-surface p-1 shadow-xl"
-        >
-          <div className="px-3 py-2">
-            <p className="text-sm font-semibold">{identity}</p>
-            <p className="text-xs text-fg-muted">{me.user.email ?? me.user.phone}</p>
-          </div>
-          <DM.Separator className="my-1 h-px bg-border" />
-          <DM.Item asChild>
-            <Link
-              href="/app/security"
-              className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm outline-none data-[highlighted]:bg-surface-muted"
-            >
-              <ShieldCheck aria-hidden className="size-4" />
-              {t('nav.security')}
-            </Link>
-          </DM.Item>
-          <DM.Item
-            onSelect={() => void logout()}
-            className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm text-danger outline-none data-[highlighted]:bg-surface-muted"
-          >
-            <LogOut aria-hidden className="size-4" />
-            {t('common.logout')}
-          </DM.Item>
-        </DM.Content>
-      </DM.Portal>
-    </DM.Root>
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex size-9 items-center justify-center rounded-full ring-brand/30 transition hover:ring-4"
+      aria-label={t('shell.account')}
+      aria-haspopup="dialog"
+    >
+      <span className="flex size-8 items-center justify-center rounded-full bg-brand-alt text-[13px] font-bold text-white dark:text-bg">
+        {initialsOf(identity)}
+      </span>
+    </button>
   );
 }
 
@@ -426,6 +389,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const me = useMe();
   const ctx = useTenantContext();
   const [drawer, setDrawer] = useState(false);
+  const [panel, setPanel] = useState<'profile' | 'notifications' | null>(null);
+  // Unread count stays fresh between context loads.
+  const unreadQ = useQuery({
+    queryKey: ['notifications', 'unread'],
+    queryFn: () =>
+      api<{ unread: number }>('/v1/notifications', { query: { page: 1, pageSize: 1 } }),
+    enabled: !!ctx.data,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
   // Desktop sidebar can shrink to an icon rail; remembered per browser.
   const [collapsed, setCollapsed] = useState(false);
   useEffect(() => {
@@ -448,7 +421,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (me.data?.onboarding && me.data.tenants.length === 0) router.replace('/onboarding');
   }, [me.data, router]);
-  useEffect(() => setDrawer(false), [pathname]);
+  useEffect(() => {
+    setDrawer(false);
+    setPanel(null);
+  }, [pathname]);
 
   if (me.isPending || ctx.isPending) {
     return (
@@ -470,6 +446,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const c = ctx.data;
   const m = me.data;
   const canCreate = c.membership.permissions.includes('records.create');
+  const unread = unreadQ.data?.unread ?? c.unreadNotifications;
 
   return (
     <div
@@ -574,22 +551,27 @@ export function AppShell({ children }: { children: ReactNode }) {
               <LanguageToggle />
               <ThemeToggle />
             </span>
-            <Link
-              href="/app/notifications"
-              className="relative flex size-9 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-muted hover:text-fg"
-              aria-label={t('shell.notifications', { count: c.unreadNotifications })}
+            <button
+              type="button"
+              onClick={() => setPanel('notifications')}
+              aria-haspopup="dialog"
+              className={cn(
+                'relative flex size-9 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-muted hover:text-fg',
+                panel === 'notifications' && 'bg-surface-muted text-fg',
+              )}
+              aria-label={t('shell.notifications', { count: unread })}
             >
-              <Bell aria-hidden className="size-[18px]" />
-              {c.unreadNotifications > 0 ? (
+              <Bell aria-hidden className={cn('size-[18px]', unread > 0 && 'bell-ring')} />
+              {unread > 0 ? (
                 <span
                   aria-hidden
-                  className="absolute top-0.5 right-0.5 flex min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[11px] font-bold text-white dark:text-bg"
+                  className="absolute top-0.5 right-0.5 flex min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[11px] font-bold text-white ring-2 ring-surface dark:text-bg"
                 >
-                  {c.unreadNotifications > 99 ? '99+' : c.unreadNotifications}
+                  {unread > 99 ? '99+' : unread}
                 </span>
               ) : null}
-            </Link>
-            <UserMenu me={m} />
+            </button>
+            <AvatarButton me={m} onClick={() => setPanel('profile')} />
           </div>
         </div>
       </header>
@@ -615,6 +597,17 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </main>
       <BottomNav ctx={c} onMore={() => setDrawer(true)} />
+      <NotificationsDrawer
+        open={panel === 'notifications'}
+        onOpenChange={(o) => setPanel(o ? 'notifications' : null)}
+        timezone={c.tenant.timezone}
+      />
+      <ProfileDrawer
+        open={panel === 'profile'}
+        onOpenChange={(o) => setPanel(o ? 'profile' : null)}
+        me={m}
+        ctx={c}
+      />
     </div>
   );
 }

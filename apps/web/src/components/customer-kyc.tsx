@@ -20,7 +20,9 @@ import {
   KYC_ID_TYPES,
   KYC_STATUSES,
 } from '@csp2all/shared';
-import { api } from '@/lib/api';
+import { api, isApiError } from '@/lib/api';
+import { BeneficiaryForm, BankIcon, type BeneficiaryValues } from './beneficiary-form';
+import { bankByName, bankForIfsc } from '@/lib/banks';
 import { useI18n } from '@/lib/i18n';
 import { errorMessage, useFormErrors, usePermissions, zodToFieldErrors } from '@/lib/hooks';
 import { openSignedUrl } from '@/lib/download';
@@ -450,6 +452,7 @@ export function BeneficiariesCard({ customerId }: { customerId: string }) {
               key={b.id}
               className={cn('flex items-center gap-3 px-4 py-2.5', !b.active && 'opacity-55')}
             >
+              <BankIcon bank={bankForIfsc(b.ifsc ?? '') ?? bankByName(b.bankName)} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold">{b.name}</span>
                 <span className="block truncate text-xs text-fg-muted">
@@ -477,13 +480,27 @@ function BeneficiaryDrawer({ customerId, onClose }: { customerId: string; onClos
   const { t } = useI18n();
   const qc = useQueryClient();
   const errs = useFormErrors();
-  const [f, setF] = useState({ name: '', bankName: '', accountNumber: '', ifsc: '' });
+  const [f, setF] = useState<BeneficiaryValues>({
+    accountNumber: '',
+    ifsc: '',
+    bankName: '',
+    beneficiaryName: '',
+  });
   const [busy, setBusy] = useState(false);
+  // API field names → form field names.
+  const toForm = (fe: Record<string, string[]>) =>
+    Object.fromEntries(
+      Object.entries(fe).map(([k, v]) => [k === 'name' ? 'beneficiaryName' : k, v]),
+    );
   const save = async () => {
     errs.clear();
-    const body = { ...f, ifsc: f.ifsc.trim() || null };
-    const r = beneficiaryCreateSchema.safeParse(body);
-    if (!r.success) return errs.setFields(zodToFieldErrors(r.error));
+    const r = beneficiaryCreateSchema.safeParse({
+      name: f.beneficiaryName,
+      bankName: f.bankName,
+      accountNumber: f.accountNumber,
+      ifsc: f.ifsc.trim() || null,
+    });
+    if (!r.success) return errs.setFields(toForm(zodToFieldErrors(r.error)));
     setBusy(true);
     try {
       await api(`/v1/customers/${customerId}/beneficiaries`, { method: 'POST', body: r.data });
@@ -491,38 +508,16 @@ function BeneficiaryDrawer({ customerId, onClose }: { customerId: string; onClos
       onClose();
     } catch (e) {
       errs.fromError(e);
+      if (isApiError(e) && e.fields) errs.setFields(toForm(e.fields));
       setBusy(false);
     }
   };
-  const input = (
-    k: keyof typeof f,
-    label: string,
-    extra: Record<string, unknown> = {},
-    required = true,
-  ) => (
-    <Field
-      label={label}
-      required={required}
-      optionalLabel={required ? undefined : t('common.optional')}
-      error={errs.get(k)}
-    >
-      {(p) => (
-        <Input
-          id={p.id}
-          aria-describedby={p.describedBy}
-          aria-invalid={p.invalid || undefined}
-          value={f[k]}
-          onChange={(e) => setF((x) => ({ ...x, [k]: e.target.value }))}
-          {...extra}
-        />
-      )}
-    </Field>
-  );
   return (
     <Drawer
       open
       onOpenChange={(o) => !o && onClose()}
       title="Add beneficiary"
+      description="Account number first, then IFSC — the bank is picked for you."
       icon={
         <span className="grid size-10 place-items-center rounded-xl bg-brand-bg text-brand">
           <Landmark aria-hidden className="size-5" />
@@ -533,22 +528,18 @@ function BeneficiaryDrawer({ customerId, onClose }: { customerId: string; onClos
           <Button variant="ghost" onClick={onClose}>
             {t('common.cancel')}
           </Button>
-          <Button onClick={save} loading={busy}>
-            {t('common.save')}
+          <Button onClick={save} loading={busy} icon={<Plus aria-hidden className="size-4" />}>
+            Add beneficiary
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
-        {input('name', 'Beneficiary name', { maxLength: 80 })}
-        {input('bankName', 'Bank name', { maxLength: 80 })}
-        {input('accountNumber', 'Account number', {
-          maxLength: 18,
-          inputMode: 'numeric',
-          autoComplete: 'off',
-          className: 'money',
-        })}
-        {input('ifsc', 'IFSC', { maxLength: 11, className: 'uppercase' }, false)}
+        <BeneficiaryForm
+          value={f}
+          onChange={(patch) => setF((x) => ({ ...x, ...patch }))}
+          error={(k) => errs.get(k) ?? undefined}
+        />
         {errs.formMessage && !Object.keys(errs.fields).length ? (
           <Alert tone="danger">{errs.formMessage}</Alert>
         ) : null}

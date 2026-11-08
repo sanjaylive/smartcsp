@@ -212,6 +212,70 @@ export class IntegrationsService implements OnModuleInit {
     return h;
   }
 
+  // ------------------------------------------------------------------ account name check
+
+  /** Whether the shop can verify a beneficiary's account name through its connected provider. */
+  async accountVerifyStatus(ctx: TenantCtx) {
+    return this.db.inTenant(ctx, async (tx) => {
+      const cfg = await tx.connectorConfig.findUnique({
+        where: { tenantId_provider: { tenantId: ctx.tenantId, provider: 'PAY2ALL' } },
+      });
+      const adapter = this.adapterFor(cfg);
+      const dmt = (await this.availability.list(tx, ctx)).find((s) => s.code === 'DMT');
+      const available = !!adapter && adapter.supports('DMT') && !!dmt?.providerExecution.available;
+      return {
+        available,
+        mode: available ? adapter!.mode : null,
+        reason: available ? null : (dmt?.providerExecution.reason ?? 'NOT_CONFIGURED'),
+      };
+    });
+  }
+
+  async verifyAccount(ctx: TenantCtx, dto: { accountNumber: string; ifsc: string }) {
+    const status = await this.accountVerifyStatus(ctx);
+    if (!status.available)
+      throw new AppError(
+        'CONNECTOR_UNAVAILABLE',
+        'Account verification needs a connected Pay2All account. Enter the name manually.',
+        { reason: status.reason },
+      );
+    const cfg = await this.db.inTenant(ctx, (tx) =>
+      tx.connectorConfig.findUnique({
+        where: { tenantId_provider: { tenantId: ctx.tenantId, provider: 'PAY2ALL' } },
+      }),
+    );
+    const adapter = this.adapterFor(cfg)!;
+    this.breaker(adapter.id).assertClosed();
+    let r: Awaited<ReturnType<ProviderAdapter['verifyAccount']>>;
+    try {
+      r = await adapter.verifyAccount(dto, config().PROVIDER_TIMEOUT_MS);
+      this.breaker(adapter.id).success();
+    } catch (e) {
+      this.breaker(adapter.id).failure();
+      if (e instanceof AppError) throw e;
+      throw new AppError(
+        'CONNECTOR_UNAVAILABLE',
+        'Could not reach the provider to verify the account. Enter the name manually or try again.',
+      );
+    }
+    await this.db.inTenant(ctx, (tx) =>
+      this.audit.tenant(tx, ctx, {
+        action: 'beneficiary.account_verified',
+        targetType: 'connector',
+        targetId: cfg!.id,
+        data: {
+          mode: adapter.mode,
+          result: r.status,
+          account: `••••${dto.accountNumber.slice(-4)}`,
+          ifsc: dto.ifsc,
+        },
+      }),
+    );
+    return r.status === 'VERIFIED'
+      ? { verified: true as const, name: r.name, mode: adapter.mode }
+      : { verified: false as const, message: r.message ?? 'Account not found', mode: adapter.mode };
+  }
+
   // ------------------------------------------------------------------ execution
 
   /**

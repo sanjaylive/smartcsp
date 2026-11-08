@@ -9,7 +9,7 @@ import {
   Put,
   Req,
 } from '@nestjs/common';
-import { connectorConfigSchema } from '@csp2all/shared';
+import { accountVerifySchema, connectorConfigSchema } from '@csp2all/shared';
 import { Ctx, Public, TenantAccess, type AppRequest } from '../../common/access';
 import type { TenantCtx } from '../../common/db';
 import { ApiDoc, parse } from '../../common/http';
@@ -47,6 +47,28 @@ export class IntegrationsController {
   @ApiDoc({ summary: 'Run a connector health check', tags: ['Integrations'] })
   health(@Ctx() ctx: TenantCtx) {
     return this.svc.health(ctx);
+  }
+
+  @Get('beneficiaries/verify')
+  @TenantAccess('records.create')
+  @ApiDoc({
+    summary: 'Whether beneficiary account names can be verified through the connected provider',
+    tags: ['Integrations'],
+  })
+  accountVerifyStatus(@Ctx() ctx: TenantCtx) {
+    return this.svc.accountVerifyStatus(ctx);
+  }
+
+  @Post('beneficiaries/verify')
+  @HttpCode(200)
+  @TenantAccess('records.create')
+  @ApiDoc({
+    summary: "Look up a bank account holder's name before a transfer (no money moves)",
+    tags: ['Integrations'],
+    body: accountVerifySchema,
+  })
+  verifyAccount(@Ctx() ctx: TenantCtx, @Body() body: unknown) {
+    return this.svc.verifyAccount(ctx, parse(accountVerifySchema, body));
   }
 
   @Get('provider-operations')

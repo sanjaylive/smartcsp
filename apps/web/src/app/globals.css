@@ -716,3 +716,30 @@
     animation: none !important;
   }
 }
+
+/* Bell nudge when there are unread notifications (once every few seconds, never for reduced motion). */
+@keyframes bell-ring {
+  0%,
+  88%,
+  100% {
+    transform: rotate(0);
+  }
+  90% {
+    transform: rotate(14deg);
+  }
+  93% {
+    transform: rotate(-12deg);
+  }
+  96% {
+    transform: rotate(8deg);
+  }
+}
+.bell-ring {
+  transform-origin: 50% 10%;
+  animation: bell-ring 6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bell-ring {
+    animation: none;
+  }
+}
