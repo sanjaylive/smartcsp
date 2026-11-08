@@ -1,16 +1,24 @@
 #!/bin/sh
 # `npm run deploy`: push main to GitHub, start the Deploy workflow (CI → build images → roll out to
-# smart-outlet.in) and follow it until it finishes. Exits non-zero if any stage fails.
+# smart-outlet.in) and follow it until it finishes. Commits any uncommitted changes first:
+#   npm run deploy -- "commit message"   (message optional). Exits non-zero if any stage fails.
 set -eu
 cd "$(dirname "$0")/../.."
 
 branch=$(git rev-parse --abbrev-ref HEAD)
 [ "$branch" = main ] || { echo "Deploy from main (you are on $branch)." >&2; exit 1; }
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "Uncommitted changes — commit or stash them first." >&2
-  exit 1
-fi
 command -v gh >/dev/null || { echo "GitHub CLI (gh) is required." >&2; exit 1; }
+
+# Uncommitted work is committed as part of the deploy (message: first argument, or a dated default).
+# Formatting and the OpenAPI spec are refreshed first, since CI fails the deploy on either.
+if [ -n "$(git status --porcelain)" ]; then
+  echo "==> Committing local changes"
+  pnpm -s prettier --write . --log-level warn
+  pnpm -s --filter @csp2all/api openapi >/dev/null
+  git add -A
+  git commit -q -m "${1:-Deploy $(date '+%Y-%m-%d %H:%M')}"
+  git log --oneline -1
+fi
 
 echo "==> Pushing main"
 git push origin main

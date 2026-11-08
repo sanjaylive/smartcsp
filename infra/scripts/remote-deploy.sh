@@ -110,34 +110,60 @@ fi
 log "Edge proxy: $DOMAIN"
 CADDYFILE=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/caddy/Caddyfile"}}{{.Source}}{{end}}{{end}}' "$EDGE_CONTAINER")
 BLOCK="$BASE/docker/smart-outlet.caddy"
+VLOG="$BASE/caddy-validate.log"
 [ -n "$CADDYFILE" ] && [ -w "$CADDYFILE" ] || die "cannot edit the edge Caddyfile ($CADDYFILE); add $BLOCK to it by hand"
+# Current Caddyfile minus any previous smartcsp section, plus the given block.
+build_candidate() {
+  awk '/^# BEGIN smartcsp/{skip=1}
+       !skip { if ($0 == "") blank++; else { for (; blank > 0; blank--) print ""; print } }
+       /^# END smartcsp$/{skip=0}' "$CADDYFILE"
+  printf '\n'
+  cat "$1"
+}
+# Shop custom domains need a global on_demand_tls ask: Caddy only issues on-demand certs it approves.
+# It goes in the global options block (a lone "{" before any site); one is created if there is none.
+add_ask() {
+  grep -qE '^[[:space:]]*on_demand_tls' "$1" && return 0
+  T=$(mktemp)
+  if grep -vE '^[[:space:]]*(#|$)' "$1" | head -1 | grep -qE '^[[:space:]]*\{[[:space:]]*$'; then
+    awk '{print} !done && /^[[:space:]]*\{[[:space:]]*$/ {
+           print "\ton_demand_tls {"; print "\t\task http://csp-api:4610/v1/public/tls-check"; print "\t}"; done=1}' "$1" > "$T"
+  else
+    { printf '{\n\ton_demand_tls {\n\t\task http://csp-api:4610/v1/public/tls-check\n\t}\n}\n\n'; cat "$1"; } > "$T"
+  fi
+  mv "$T" "$1"
+}
+validate() {
+  docker exec -i "$EDGE_CONTAINER" sh -c 'cat > /tmp/smartcsp.Caddyfile && caddy validate --config /tmp/smartcsp.Caddyfile --adapter caddyfile' \
+    < "$1" > "$VLOG" 2>&1
+}
+show_errors() { grep -iE 'error|Error' "$VLOG" | tail -8 | sed 's/^/    /' >&2 || true; }
+
 CANDIDATE=$(mktemp)
-awk '/^# BEGIN smartcsp/{skip=1}
-     !skip { if ($0 == "") blank++; else { for (; blank > 0; blank--) print ""; print } }
-     /^# END smartcsp/{skip=0}' "$CADDYFILE" > "$CANDIDATE"
-printf '\n' >> "$CANDIDATE" && cat "$BLOCK" >> "$CANDIDATE"
-# Ensure the global on_demand_tls ask (for shop custom domains) exists in the first global block.
-# Caddy only issues on-demand certs this ask approves, so the custom-domain catch-all is self-securing.
-if ! grep -q 'on_demand_tls' "$CANDIDATE"; then
-  TMP2=$(mktemp)
-  awk 'BEGIN{done=0}
-       {a[NR]=$0}
-       END{for(i=1;i<=NR;i++){print a[i];
-         if(!done && a[i] ~ /^[[:space:]]*\{[[:space:]]*$/){
-           print "\ton_demand_tls {"; print "\t\task http://csp-api:4610/v1/public/tls-check"; print "\t}"; done=1}}}' \
-    "$CANDIDATE" > "$TMP2" && mv "$TMP2" "$CANDIDATE"
+build_candidate "$BLOCK" > "$CANDIDATE"
+add_ask "$CANDIDATE"
+if ! validate "$CANDIDATE"; then
+  log "WARNING: edge Caddy rejected the shop custom-domain block:"
+  show_errors
+  log "  applying $DOMAIN without custom domains (main site unaffected)"
+  BASIC=$(mktemp)
+  awk '/^# >>> custom-domains/{s=1} !s{print} /^# <<< custom-domains/{s=0}' "$BLOCK" > "$BASIC"
+  build_candidate "$BASIC" > "$CANDIDATE"
+  rm -f "$BASIC"
+  if ! validate "$CANDIDATE"; then
+    show_errors
+    rm -f "$CANDIDATE"
+    die "edge Caddy rejected the smartcsp block; Caddyfile left unchanged (full output: $VLOG)"
+  fi
 fi
 if cmp -s "$CANDIDATE" "$CADDYFILE"; then
   log "Edge Caddyfile already up to date"
-elif docker exec -i "$EDGE_CONTAINER" sh -c 'cat > /tmp/smartcsp.Caddyfile && caddy validate --config /tmp/smartcsp.Caddyfile --adapter caddyfile' < "$CANDIDATE" >/dev/null 2>&1; then
+else
   cp "$CADDYFILE" "$BASE/Caddyfile.edge.bak"
   cat "$CANDIDATE" > "$CADDYFILE"
   docker exec "$EDGE_CONTAINER" caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile \
     || { cat "$BASE/Caddyfile.edge.bak" > "$CADDYFILE"; rm -f "$CANDIDATE"; die "edge Caddy rejected the reload; its Caddyfile was restored"; }
   log "Edge Caddy reloaded (previous file: $BASE/Caddyfile.edge.bak)"
-else
-  rm -f "$CANDIDATE"
-  die "edge Caddy rejected the smartcsp block; Caddyfile left unchanged"
 fi
 rm -f "$CANDIDATE"
 

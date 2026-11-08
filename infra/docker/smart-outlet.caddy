@@ -39,6 +39,7 @@ www.smart-outlet.in {
 	redir https://smart-outlet.in{uri} permanent
 }
 
+# >>> custom-domains (dropped by remote-deploy.sh if the edge Caddy rejects it)
 # Verified shop custom domains. On-demand HTTPS is issued only for hosts that
 # /api/public/tls-check approves (the global on_demand_tls ask, added by remote-deploy.sh),
 # so an unapproved domain hitting this catch-all simply fails TLS. Routing mirrors the main
@@ -69,4 +70,5 @@ https:// {
 		format json
 	}
 }
+# <<< custom-domains
 # END smartcsp

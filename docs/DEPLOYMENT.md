@@ -42,11 +42,14 @@ That host's only public entry point is the pay2all stack's Caddy (`pay2all-caddy
 (`infra/docker/compose.smart-outlet.yml`, compose project `smartcsp`) publishes no ports: `csp-api`, `csp-web` and
 `csp-admin` join the `pay2all_internal` network and every deploy re-applies the `# BEGIN smartcsp … # END smartcsp`
 block (`infra/docker/smart-outlet.caddy`) to that Caddy's Caddyfile — validated first, previous file kept in
-`/opt/csp2all/Caddyfile.edge.bak`, restored if the reload fails. A pay2all release can drop the block; the next
+`/opt/csp2all/Caddyfile.edge.bak`, restored if the reload fails. The global `on_demand_tls` ask for shop custom domains is added to (or creates)
+the global options block; if Caddy still rejects the custom-domain catch-all, the deploy logs the error and applies
+the main site without it. A pay2all release can drop the block; the next
 smartcsp deploy puts it back. Containers have memory limits; uploads/exports use the `fs` driver on the
 `smartcsp_storage` volume.
 
-**Every release:** `npm run deploy` (`infra/scripts/deploy.sh`) — requires a clean `main`; pushes to GitHub, starts
+**Every release:** `npm run deploy` (`infra/scripts/deploy.sh`, optional commit message: `npm run deploy -- "msg"`) — on `main`,
+commits any uncommitted changes (after Prettier + OpenAPI regeneration), pushes to GitHub, starts
 `.github/workflows/deploy.yml` and follows it: full CI → images `ghcr.io/sanjaylive/smartcsp-{api,web,admin}:<sha>`
 → SSH → `infra/scripts/remote-deploy.sh` (pre-deploy `pg_dump` to `/opt/csp2all/backups`, `csp-migrate` release job,
 `up --wait` on health checks, edge Caddy block) → HTTPS smoke test. Rollback: re-run the Deploy workflow on an older
