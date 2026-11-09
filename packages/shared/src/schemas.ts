@@ -139,6 +139,8 @@ export const recordCreateBase = z.object({
   paymentMode: z.string().trim().max(40).optional().nullable(),
   /** Shop-defined provider / portal the service was done on. */
   provider: z.string().trim().max(60).optional().nullable(),
+  /** The shop's own UPI ID / bank account the customer paid into (UPI and BANK only). */
+  paymentAccountId: uuid.optional().nullable(),
   assignedToUserId: uuid.optional().nullable(),
   notes: safeText(1000).optional().nullable(),
   followUpDate: isoDate.optional().nullable(),
@@ -173,6 +175,7 @@ export const recordUpdateSchema = z.object({
   principalMethod: z.enum(['CASH', 'UPI', 'BANK']).optional(),
   externalRef: z.string().trim().max(60).optional().nullable(),
   paymentMode: z.string().trim().max(40).optional().nullable(),
+  paymentAccountId: uuid.optional().nullable(),
   provider: z.string().trim().max(60).optional().nullable(),
   assignedToUserId: uuid.optional().nullable(),
   notes: safeText(1000).optional().nullable(),
@@ -359,8 +362,16 @@ export const paymentSubmissionSchema = z.object({
 });
 
 // ----------------------------------------------------------------------------- integrations
+/**
+ * DISABLED  – every service is Offline (manual records only).
+ * UAT       – Pay2All test mode: requests carry mode=UAT, no wallet debit (Recharge only, per Pay2All).
+ * LIVE      – real Pay2All transactions from the shop's own wallet.
+ * SIMULATOR – development only; never contacts Pay2All.
+ */
+export const CONNECTOR_MODES = ['DISABLED', 'SIMULATOR', 'UAT', 'LIVE'] as const;
+export type ConnectorMode = (typeof CONNECTOR_MODES)[number];
 export const connectorConfigSchema = z.object({
-  mode: z.enum(['DISABLED', 'SIMULATOR']),
+  mode: z.enum(CONNECTOR_MODES),
   /** Credentials are write-only: accepted here, never returned (only masked). */
   credentials: z.record(z.string(), z.string().max(500)).optional(),
   enabledServices: z.array(z.enum(SERVICE_CODES)).default([]),
@@ -589,3 +600,89 @@ export const profileUpdateSchema = z
   .refine((v) => v.displayName !== undefined || v.locale !== undefined, {
     message: 'Nothing to update',
   });
+
+// ----------------------------------------------------------------------------- shop payment accounts
+/** Where a shop receives customer payments: its own UPI IDs (with optional QR) and bank accounts. */
+export const PAYMENT_ACCOUNT_KINDS = ['UPI', 'BANK'] as const;
+export type PaymentAccountKind = (typeof PAYMENT_ACCOUNT_KINDS)[number];
+export const UPI_APPS = [
+  'PHONEPE',
+  'PAYTM',
+  'GPAY',
+  'BHIM',
+  'BHARATPE',
+  'AMAZONPAY',
+  'OTHER',
+] as const;
+export type UpiApp = (typeof UPI_APPS)[number];
+export const BANK_ACCOUNT_TYPES = ['CURRENT', 'SAVINGS'] as const;
+
+export const upiIdSchema = z
+  .string()
+  .trim()
+  .transform((v) => v.toLowerCase())
+  .pipe(
+    z
+      .string()
+      .regex(
+        /^[a-z0-9][a-z0-9.\-_]{1,255}@[a-z][a-z0-9]{1,63}$/,
+        'Enter a valid UPI ID, e.g. myshop@ybl',
+      ),
+  );
+const accountLabel = safeText(40).pipe(z.string().min(2, 'Enter a name for this account'));
+
+export const paymentAccountCreateSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('UPI'),
+    label: accountLabel,
+    /** Optional: a shop may only have a printed QR (uploaded after creating the account). */
+    upiId: upiIdSchema.optional().nullable(),
+    payeeName: safeText(60).optional().nullable(),
+    upiApp: z.enum(UPI_APPS).default('OTHER'),
+    isDefault: z.boolean().default(false),
+  }),
+  z.object({
+    kind: z.literal('BANK'),
+    label: accountLabel,
+    holderName: safeText(80).pipe(z.string().min(2, 'Enter the account holder name')),
+    bankName: safeText(80).pipe(z.string().min(2, 'Choose the bank')),
+    accountNumber: beneficiaryCreateSchema.shape.accountNumber,
+    ifsc: ifscCode,
+    accountType: z.enum(BANK_ACCOUNT_TYPES).default('CURRENT'),
+    isDefault: z.boolean().default(false),
+  }),
+]);
+export const paymentAccountUpdateSchema = z.object({
+  version: z.number().int(),
+  label: accountLabel.optional(),
+  upiId: upiIdSchema.optional().nullable(),
+  payeeName: safeText(60).optional().nullable(),
+  upiApp: z.enum(UPI_APPS).optional(),
+  holderName: safeText(80).pipe(z.string().min(2)).optional(),
+  bankName: safeText(80).pipe(z.string().min(2)).optional(),
+  accountNumber: beneficiaryCreateSchema.shape.accountNumber.optional(),
+  ifsc: ifscCode.optional(),
+  accountType: z.enum(BANK_ACCOUNT_TYPES).optional(),
+  isDefault: z.boolean().optional(),
+  active: z.boolean().optional(),
+});
+
+/**
+ * NPCI UPI deep link (what payment QR codes encode). Any UPI app scanning it opens a payment to `pa`
+ * with the amount pre-filled.
+ */
+export function upiPaymentUri(p: {
+  upiId: string;
+  payeeName?: string | null;
+  amountPaise?: number | null;
+  note?: string | null;
+  ref?: string | null;
+}): string {
+  const q: string[] = [`pa=${encodeURIComponent(p.upiId)}`];
+  if (p.payeeName) q.push(`pn=${encodeURIComponent(p.payeeName)}`);
+  if (p.amountPaise && p.amountPaise > 0) q.push(`am=${(p.amountPaise / 100).toFixed(2)}`);
+  q.push('cu=INR');
+  if (p.note) q.push(`tn=${encodeURIComponent(p.note.slice(0, 50))}`);
+  if (p.ref) q.push(`tr=${encodeURIComponent(p.ref.slice(0, 35))}`);
+  return `upi://pay?${q.join('&')}`;
+}

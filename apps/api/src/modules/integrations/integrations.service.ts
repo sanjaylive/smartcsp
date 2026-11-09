@@ -12,7 +12,7 @@ import { config } from '../../config/config';
 import { Db, type TenantCtx, type Tx } from '../../common/db';
 import { AppError, notFound } from '../../common/errors';
 import { AuditService } from '../../common/audit';
-import { encryptSecret, sha256 } from '../../common/crypto';
+import { decryptSecret, encryptSecret, randomToken, sha256 } from '../../common/crypto';
 import { RedisService } from '../../common/redis';
 import { JobsService } from '../../jobs/jobs.service';
 import { EntitlementsService } from '../subscription/entitlements.service';
@@ -21,22 +21,53 @@ import { ServiceAvailabilityService } from '../services/service-availability.ser
 import {
   CircuitBreaker,
   OutcomeUnknownError,
-  PAY2ALL_MISSING,
-  Pay2AllAdapter,
   SimulatorAdapter,
   type ProviderAdapter,
   type ProviderResultStatus,
 } from './providers';
+import { simulatorCatalogFetch } from './simulator-catalog';
+import {
+  PAY2ALL_LIVE_SERVICES,
+  PAY2ALL_PENDING_SERVICES,
+  Pay2AllAdapter,
+  Pay2AllClient,
+  parsePay2AllCallback,
+  type Pay2AllCredentials,
+} from './pay2all';
+
+/** Ids chosen on the record screen for a Live Pay2All operation. */
+export const pay2allLiveSchema = z.object({
+  providerId: z.coerce.number().int().positive().optional(),
+  billerId: z.string().trim().min(1).max(64).optional(),
+  referenceId: z.string().trim().max(128).optional().nullable(),
+  params: z.record(z.string().max(64), z.string().trim().max(128)).optional(),
+  mobile: z
+    .string()
+    .regex(/^[6-9]\d{9}$/, 'Enter a 10-digit mobile number')
+    .optional()
+    .nullable(),
+});
 
 export const providerExecuteSchema = recordCreateBase
   .omit({ post: true, clientRef: true, opStatus: true })
   .extend({
     confirmed: z.literal(true, { message: 'Confirm the details before sending to the provider' }),
+    live: pay2allLiveSchema.optional(),
   })
   .refine(collectedNeedsMethod, {
     message: 'Choose how the amount was collected',
     path: ['paymentMethod'],
   });
+
+export const pay2allLookupSchema = z.object({
+  number: z.string().regex(/^\d{6,20}$/, 'Enter the number'),
+  type: z.enum(['mobile', 'dth']).default('mobile'),
+});
+export const pay2allBillFetchSchema = z.object({
+  billerId: z.string().trim().min(1).max(64),
+  params: z.record(z.string().max(64), z.string().trim().max(128)),
+  mobile: z.string().regex(/^[6-9]\d{9}$/, 'Enter a 10-digit mobile number'),
+});
 
 type OpStatus = 'INITIATED' | 'PENDING' | 'UNKNOWN' | 'CONFIRMED' | 'FAILED';
 const OP_TRANSITIONS: Record<OpStatus, OpStatus[]> = {
@@ -55,12 +86,15 @@ function maskCredentials(creds: Record<string, string>) {
   );
 }
 
+type CfgLike = Pick<ConnectorConfig, 'mode' | 'credentialsEnc'> | null;
+
 @Injectable()
 export class IntegrationsService implements OnModuleInit {
   private readonly log = new Logger('Integrations');
   private readonly breakers = new Map<string, CircuitBreaker>();
   private simulator: SimulatorAdapter | null = null;
-  private readonly pay2all = new Pay2AllAdapter();
+  /** Injectable for tests so no real Pay2All call is ever made. */
+  fetchImpl: typeof fetch = (...a) => fetch(...a);
 
   constructor(
     private readonly db: Db,
@@ -82,8 +116,23 @@ export class IntegrationsService implements OnModuleInit {
     return config().CONNECTOR_SIMULATOR_ENABLED && config().NODE_ENV !== 'production';
   }
 
-  /** Adapter for a tenant config. LIVE Pay2All stays disabled until documented and approved. */
-  adapterFor(cfg: Pick<ConnectorConfig, 'mode'> | null): ProviderAdapter | null {
+  private rawCredentials(cfg: CfgLike): Record<string, string> {
+    if (!cfg?.credentialsEnc) return {};
+    try {
+      return JSON.parse(decryptSecret(cfg.credentialsEnc)) as Record<string, string>;
+    } catch {
+      this.log.error('Could not decrypt connector credentials');
+      return {};
+    }
+  }
+
+  private credentials(cfg: CfgLike): Pay2AllCredentials | null {
+    const c = this.rawCredentials(cfg);
+    return c.apiToken ? (c as unknown as Pay2AllCredentials) : null;
+  }
+
+  /** Adapter for a shop's connector settings, or null when every service is Offline. */
+  adapterFor(cfg: CfgLike): ProviderAdapter | null {
     if (!cfg || cfg.mode === 'DISABLED') return null;
     if (cfg.mode === 'SIMULATOR') {
       if (!this.simulatorEnabled()) return null;
@@ -93,7 +142,14 @@ export class IntegrationsService implements OnModuleInit {
       );
       return this.simulator;
     }
-    return this.pay2all;
+    const creds = this.credentials(cfg);
+    if (!creds) return null;
+    return new Pay2AllAdapter(new Pay2AllClient(creds, cfg.mode === 'UAT', this.fetchImpl), creds);
+  }
+
+  /** What an operation row records as its mode (UAT is kept apart from real LIVE money). */
+  private opMode(cfg: CfgLike, adapter: ProviderAdapter) {
+    return cfg?.mode === 'UAT' ? 'UAT' : adapter.mode;
   }
 
   private breaker(id: string) {
@@ -102,30 +158,47 @@ export class IntegrationsService implements OnModuleInit {
     return b;
   }
 
+  private loadConfig(tx: Tx, tenantId: string) {
+    return tx.connectorConfig.findUnique({
+      where: { tenantId_provider: { tenantId, provider: 'PAY2ALL' } },
+    });
+  }
+
+  private callbackUrl(token: string | null | undefined) {
+    return token
+      ? `${config().PUBLIC_API_URL.replace(/\/$/, '')}/v1/webhooks/pay2all/${token}`
+      : null;
+  }
+
   // ------------------------------------------------------------------ configuration
 
   async overview(ctx: TenantCtx) {
     return this.db.inTenant(ctx, async (tx) => {
-      const cfg = await tx.connectorConfig.findUnique({
-        where: { tenantId_provider: { tenantId: ctx.tenantId, provider: 'PAY2ALL' } },
-      });
+      const cfg = await this.loadConfig(tx, ctx.tenantId);
       const eff = await this.entitlements.effective(tx, ctx.tenantId);
       return {
         providers: [
           {
             provider: 'PAY2ALL',
             mode: cfg?.mode ?? 'DISABLED',
-            liveAvailable: false,
-            liveUnavailableReason:
-              'Official Pay2All documentation and credentials have not been supplied.',
-            missing: PAY2ALL_MISSING,
+            liveAvailable: true,
+            liveUnavailableReason: null,
+            /** Services that can run Live through Pay2All today. */
+            liveServices: PAY2ALL_LIVE_SERVICES,
+            /** Services that can run Live in Pay2All's UAT test mode. */
+            uatServices: ['RECHARGE'] as ServiceCode[],
+            /** Offered by Pay2All but not yet documented — Offline only until they are. */
+            pendingServices: PAY2ALL_PENDING_SERVICES,
+            missing: [] as string[],
             simulatorAvailable: this.simulatorEnabled(),
+            hasCredentials: !!cfg?.credentialsEnc,
             credentialsMasked: cfg?.credentialsMasked ?? null,
             keyVersion: cfg?.keyVersion ?? null,
             enabledServices: cfg?.enabledServices ?? [],
             supportedServices: Object.values(SERVICE_REGISTRY)
               .filter((s) => s.providerCapable)
               .map((s) => s.code),
+            callbackUrl: this.callbackUrl(cfg?.webhookToken),
             lastHealthAt: cfg?.lastHealthAt ?? null,
             lastHealthStatus: cfg?.lastHealthStatus ?? null,
             version: cfg?.version ?? 0,
@@ -133,33 +206,50 @@ export class IntegrationsService implements OnModuleInit {
         ],
         planAllowsConnector: eff.entitlements.connectorEligible,
         notice:
-          'Manual records never trigger provider operations. The simulator never moves real money.',
+          'Offline services are recorded by hand. Live services are sent to Pay2All and paid from your Pay2All wallet.',
       };
     });
   }
 
   async configure(ctx: TenantCtx, dto: z.infer<typeof connectorConfigSchema>) {
     return this.db.inTenant(ctx, async (tx) => {
-      if (dto.mode === 'SIMULATOR') {
-        if (!this.simulatorEnabled())
-          throw new AppError(
-            'CONNECTOR_UNAVAILABLE',
-            'The simulator is not enabled in this environment',
-          );
+      if (dto.mode === 'SIMULATOR' && !this.simulatorEnabled())
+        throw new AppError(
+          'CONNECTOR_UNAVAILABLE',
+          'The simulator is not enabled in this environment',
+        );
+      const existing = await this.loadConfig(tx, ctx.tenantId);
+      const incoming = Object.fromEntries(
+        Object.entries(dto.credentials ?? {})
+          .filter(([, v]) => v.trim())
+          .map(([k, v]) => [k, v.trim()]),
+      );
+      const credentialsChanged = Object.keys(incoming).length > 0;
+      const merged = { ...this.rawCredentials(existing), ...incoming };
+      if ((dto.mode === 'LIVE' || dto.mode === 'UAT') && !merged.apiToken)
+        throw new AppError('VALIDATION_FAILED', 'Enter your Pay2All API token', undefined, {
+          'credentials.apiToken': ['Enter your Pay2All API token'],
+        });
+      if (dto.mode !== 'DISABLED')
         await this.entitlements.assertBoolean(tx, ctx.tenantId, 'connectorEligible');
-      }
-      const existing = await tx.connectorConfig.findUnique({
-        where: { tenantId_provider: { tenantId: ctx.tenantId, provider: 'PAY2ALL' } },
-      });
-      const credentialsChanged = !!dto.credentials && Object.keys(dto.credentials).length > 0;
+
+      const allowed: ServiceCode[] =
+        dto.mode === 'SIMULATOR'
+          ? Object.values(SERVICE_REGISTRY)
+              .filter((s) => s.providerCapable)
+              .map((s) => s.code)
+          : dto.mode === 'UAT'
+            ? ['RECHARGE']
+            : PAY2ALL_LIVE_SERVICES;
       const data = {
         mode: dto.mode,
-        enabledServices: dto.enabledServices.filter((c) => SERVICE_REGISTRY[c].providerCapable),
+        enabledServices: dto.enabledServices.filter((c) => allowed.includes(c)),
         updatedByUserId: ctx.userId,
+        webhookToken: existing?.webhookToken ?? randomToken(24),
         ...(credentialsChanged
           ? {
-              credentialsEnc: encryptSecret(JSON.stringify(dto.credentials)),
-              credentialsMasked: maskCredentials(dto.credentials!),
+              credentialsEnc: encryptSecret(JSON.stringify(merged)),
+              credentialsMasked: maskCredentials(merged),
               keyVersion: (existing?.keyVersion ?? 0) + 1,
             }
           : {}),
@@ -187,18 +277,23 @@ export class IntegrationsService implements OnModuleInit {
         enabledServices: cfg.enabledServices,
         credentialsMasked: cfg.credentialsMasked,
         keyVersion: cfg.keyVersion,
+        callbackUrl: this.callbackUrl(cfg.webhookToken),
       };
     });
   }
 
   async health(ctx: TenantCtx) {
-    const cfg = await this.db.inTenant(ctx, (tx) =>
-      tx.connectorConfig.findUnique({
-        where: { tenantId_provider: { tenantId: ctx.tenantId, provider: 'PAY2ALL' } },
-      }),
-    );
-    const adapter = this.adapterFor(cfg) ?? this.pay2all;
-    const h = await adapter.health();
+    const cfg = await this.db.inTenant(ctx, (tx) => this.loadConfig(tx, ctx.tenantId));
+    const adapter = this.adapterFor(cfg);
+    const h = adapter
+      ? await adapter.health()
+      : {
+          ok: false,
+          detail:
+            cfg && cfg.mode !== 'DISABLED'
+              ? 'Add your Pay2All API token first'
+              : 'All services are Offline',
+        };
     if (cfg)
       await this.db.inTenant(ctx, (tx) =>
         tx.connectorConfig.update({
@@ -212,21 +307,118 @@ export class IntegrationsService implements OnModuleInit {
     return h;
   }
 
+  // ------------------------------------------------------------------ Pay2All catalog (read-only)
+
+  /** The shop's Pay2All client, for lookups. Never used for money-moving calls. */
+  private async pay2all(ctx: TenantCtx) {
+    const cfg = await this.db.inTenant(ctx, (tx) => this.loadConfig(tx, ctx.tenantId));
+    if (cfg?.mode === 'SIMULATOR' && this.simulatorEnabled())
+      return new Pay2AllClient({ apiToken: 'simulator' }, false, simulatorCatalogFetch);
+    const creds = cfg && (cfg.mode === 'LIVE' || cfg.mode === 'UAT') ? this.credentials(cfg) : null;
+    if (!creds)
+      throw new AppError('CONNECTOR_UNAVAILABLE', 'Connect Pay2All (Live) in Integrations first');
+    return new Pay2AllClient(creds, cfg!.mode === 'UAT', this.fetchImpl);
+  }
+
+  /** Catalog lists change rarely: cache them per shop for a few hours. */
+  private async cached<T>(ctx: TenantCtx, key: string, ttlSec: number, load: () => Promise<T>) {
+    const k = `csp2all:p2a:${ctx.tenantId}:${key}`;
+    const hit = await this.redis.client.get(k).catch(() => null);
+    if (hit) return JSON.parse(hit) as T;
+    const v = await load();
+    await this.redis.client.set(k, JSON.stringify(v), 'EX', ttlSec).catch(() => undefined);
+    return v;
+  }
+
+  async p2aProviders(ctx: TenantCtx) {
+    const c = await this.pay2all(ctx);
+    return this.cached(ctx, `providers:${c.isUat}`, 6 * 3600, () =>
+      c.read<unknown>('GET', '/providers', { timeoutMs: 10_000 }),
+    );
+  }
+
+  async p2aLookup(ctx: TenantCtx, dto: z.infer<typeof pay2allLookupSchema>) {
+    const c = await this.pay2all(ctx);
+    return c.read<unknown>('POST', '/lookup', { body: dto, timeoutMs: 8000 });
+  }
+
+  async p2aPlans(ctx: TenantCtx, providerId: string, circleId?: string) {
+    if (!/^\d{1,9}$/.test(providerId))
+      throw new AppError('VALIDATION_FAILED', 'Choose the operator');
+    const c = await this.pay2all(ctx);
+    return this.cached(ctx, `plans:${providerId}:${circleId ?? ''}`, 3600, () =>
+      c.read<unknown>('GET', '/plans', {
+        query: { provider_id: providerId, circle_id: circleId },
+        timeoutMs: 10_000,
+      }),
+    );
+  }
+
+  private async bbpsClient(ctx: TenantCtx) {
+    const c = await this.pay2all(ctx);
+    if (c.isUat)
+      throw new AppError(
+        'CONNECTOR_UNAVAILABLE',
+        'Pay2All offers bill payment only in Live mode (not in UAT test mode)',
+      );
+    return c;
+  }
+
+  async p2aBbpsCategories(ctx: TenantCtx) {
+    const c = await this.bbpsClient(ctx);
+    return this.cached(ctx, 'bbps:categories', 12 * 3600, () =>
+      c.read<unknown>('GET', '/bbps/categories', { timeoutMs: 10_000 }),
+    );
+  }
+
+  async p2aBbpsBillers(ctx: TenantCtx, category: string) {
+    if (!/^[\w-]{1,64}$/.test(category))
+      throw new AppError('VALIDATION_FAILED', 'Choose a bill category');
+    const c = await this.bbpsClient(ctx);
+    return this.cached(ctx, `bbps:billers:${category}`, 12 * 3600, () =>
+      c.read<unknown>('GET', '/bbps/billers', { query: { category }, timeoutMs: 10_000 }),
+    );
+  }
+
+  async p2aBbpsBiller(ctx: TenantCtx, billerId: string) {
+    if (!/^[\w-]{1,64}$/.test(billerId)) throw new AppError('VALIDATION_FAILED', 'Choose a biller');
+    const c = await this.bbpsClient(ctx);
+    return this.cached(ctx, `bbps:biller:${billerId}`, 12 * 3600, () =>
+      c.read<unknown>('GET', `/bbps/billers/${encodeURIComponent(billerId)}`, {
+        timeoutMs: 10_000,
+      }),
+    );
+  }
+
+  async p2aBbpsFetch(ctx: TenantCtx, dto: z.infer<typeof pay2allBillFetchSchema>) {
+    const c = await this.bbpsClient(ctx);
+    return c.read<unknown>('POST', '/bbps/fetch', {
+      body: { biller_id: dto.billerId, params: dto.params, mobile_number: dto.mobile },
+      timeoutMs: 15_000,
+    });
+  }
+
   // ------------------------------------------------------------------ account name check
 
   /** Whether the shop can verify a beneficiary's account name through its connected provider. */
   async accountVerifyStatus(ctx: TenantCtx) {
     return this.db.inTenant(ctx, async (tx) => {
-      const cfg = await tx.connectorConfig.findUnique({
-        where: { tenantId_provider: { tenantId: ctx.tenantId, provider: 'PAY2ALL' } },
-      });
+      const cfg = await this.loadConfig(tx, ctx.tenantId);
       const adapter = this.adapterFor(cfg);
-      const dmt = (await this.availability.list(tx, ctx)).find((s) => s.code === 'DMT');
-      const available = !!adapter && adapter.supports('DMT') && !!dmt?.providerExecution.available;
+      const eff = await this.entitlements.effective(tx, ctx.tenantId);
+      let reason: string | null = null;
+      if (!eff.entitlements.connectorEligible) reason = 'PLAN';
+      else if (!adapter) reason = 'NOT_CONFIGURED';
+      else if (cfg?.mode === 'UAT') reason = 'LIVE_ONLY';
+      else if (adapter instanceof SimulatorAdapter) {
+        const dmt = (await this.availability.list(tx, ctx)).find((s) => s.code === 'DMT');
+        if (!dmt?.providerExecution.available)
+          reason = dmt?.providerExecution.reason ?? 'NOT_CONFIGURED';
+      }
       return {
-        available,
-        mode: available ? adapter!.mode : null,
-        reason: available ? null : (dmt?.providerExecution.reason ?? 'NOT_CONFIGURED'),
+        available: reason === null,
+        mode: reason === null ? this.opMode(cfg, adapter!) : null,
+        reason,
       };
     });
   }
@@ -236,14 +428,10 @@ export class IntegrationsService implements OnModuleInit {
     if (!status.available)
       throw new AppError(
         'CONNECTOR_UNAVAILABLE',
-        'Account verification needs a connected Pay2All account. Enter the name manually.',
+        'Account verification needs Pay2All connected in Live mode. Enter the name manually.',
         { reason: status.reason },
       );
-    const cfg = await this.db.inTenant(ctx, (tx) =>
-      tx.connectorConfig.findUnique({
-        where: { tenantId_provider: { tenantId: ctx.tenantId, provider: 'PAY2ALL' } },
-      }),
-    );
+    const cfg = await this.db.inTenant(ctx, (tx) => this.loadConfig(tx, ctx.tenantId));
     const adapter = this.adapterFor(cfg)!;
     this.breaker(adapter.id).assertClosed();
     let r: Awaited<ReturnType<ProviderAdapter['verifyAccount']>>;
@@ -290,7 +478,10 @@ export class IntegrationsService implements OnModuleInit {
     idempotencyKey: string,
     dto: z.infer<typeof providerExecuteSchema>,
   ) {
+    if (idempotencyKey.length > 64)
+      throw new AppError('VALIDATION_FAILED', 'Idempotency-Key must be at most 64 characters');
     const requestHash = sha256(JSON.stringify(dto));
+    const { live, confirmed: _confirmed, ...recordDto } = dto;
     const prepared = await this.db.inTenant(ctx, async (tx) => {
       const existing = await tx.providerOperation.findUnique({
         where: { tenantId_idempotencyKey: { tenantId: ctx.tenantId, idempotencyKey } },
@@ -303,9 +494,7 @@ export class IntegrationsService implements OnModuleInit {
           );
         return { existing };
       }
-      const cfg = await tx.connectorConfig.findUnique({
-        where: { tenantId_provider: { tenantId: ctx.tenantId, provider: 'PAY2ALL' } },
-      });
+      const cfg = await this.loadConfig(tx, ctx.tenantId);
       const adapter = this.adapterFor(cfg);
       const avail = (await this.availability.list(tx, ctx)).find((s) => s.code === dto.serviceCode);
       if (
@@ -315,14 +504,18 @@ export class IntegrationsService implements OnModuleInit {
       ) {
         throw new AppError(
           'CONNECTOR_UNAVAILABLE',
-          'Provider execution is not available for this service',
+          'Live mode is not available for this service. Save it as an Offline record instead.',
           { reason: avail?.providerExecution.reason ?? 'NOT_CONFIGURED' },
         );
       }
+      if (!dto.principalPaise)
+        throw new AppError('VALIDATION_FAILED', 'Enter the amount', undefined, {
+          principalPaise: ['Enter the amount'],
+        });
       this.breaker(adapter.id).assertClosed();
       const created = await this.records.create(
         ctx,
-        { ...dto, opStatus: 'PENDING', post: false, clientRef: null },
+        { ...recordDto, opStatus: 'PENDING', post: false, clientRef: null },
         'PROVIDER',
         tx,
       );
@@ -331,7 +524,7 @@ export class IntegrationsService implements OnModuleInit {
           tenantId: ctx.tenantId,
           recordId: created.id,
           provider: 'PAY2ALL',
-          mode: adapter.mode,
+          mode: this.opMode(cfg, adapter),
           operationType: 'EXECUTE',
           idempotencyKey,
           requestHash,
@@ -353,7 +546,7 @@ export class IntegrationsService implements OnModuleInit {
         action: 'provider.execute',
         targetType: 'provider_operation',
         targetId: op.id,
-        data: { service: dto.serviceCode, mode: adapter.mode },
+        data: { service: dto.serviceCode, mode: op.mode },
       });
       return { op, adapter, details: created.details };
     });
@@ -362,7 +555,7 @@ export class IntegrationsService implements OnModuleInit {
       return this.operationJson(ctx, prepared.existing.id);
     const { op, adapter } = prepared as { op: ProviderOperation; adapter: ProviderAdapter };
 
-    let outcome: { status: OpStatus; providerRef?: string; error?: string };
+    let outcome: { status: OpStatus; providerRef?: string; operatorRef?: string; error?: string };
     try {
       const r = await adapter.execute(
         {
@@ -371,22 +564,35 @@ export class IntegrationsService implements OnModuleInit {
           operationType: 'EXECUTE',
           amountPaise: dto.principalPaise,
           details: dto.details,
+          live: live as Record<string, unknown> | undefined,
         },
         config().PROVIDER_TIMEOUT_MS,
       );
       this.breaker(adapter.id).success();
-      outcome = { status: r.status, providerRef: r.providerRef };
-    } catch (e) {
-      this.breaker(adapter.id).failure();
-      // Never blindly retry: the request may have reached the provider. Reconciliation resolves it.
       outcome = {
-        status: 'UNKNOWN',
-        error: e instanceof OutcomeUnknownError ? e.message : 'Provider call failed after sending',
+        status: r.status,
+        providerRef: r.providerRef,
+        operatorRef: r.operatorRef,
+        error: r.status === 'FAILED' ? r.message : undefined,
       };
+    } catch (e) {
+      if (e instanceof AppError && !(e instanceof OutcomeUnknownError)) {
+        // Rejected before anything was sent (e.g. missing operator): nothing moved.
+        outcome = { status: 'FAILED', error: e.message };
+      } else {
+        this.breaker(adapter.id).failure();
+        // Never blindly retry: the request may have reached the provider. Reconciliation resolves it.
+        outcome = {
+          status: 'UNKNOWN',
+          error:
+            e instanceof OutcomeUnknownError ? e.message : 'Provider call failed after sending',
+        };
+      }
     }
     await this.db.inTenant(ctx, (tx) =>
       this.applyStatus(tx, ctx.tenantId, op.id, outcome.status, 'API', {
         providerRef: outcome.providerRef,
+        operatorRef: outcome.operatorRef,
         error: outcome.error,
       }),
     );
@@ -414,7 +620,7 @@ export class IntegrationsService implements OnModuleInit {
     operationId: string,
     to: OpStatus,
     source: 'API' | 'WEBHOOK' | 'RECONCILIATION' | 'USER',
-    data: { providerRef?: string; error?: string; runId?: string } = {},
+    data: { providerRef?: string; operatorRef?: string; error?: string; runId?: string } = {},
   ) {
     await tx.$queryRaw`SELECT id FROM provider_operations WHERE id = ${operationId}::uuid AND "tenantId" = ${tenantId}::uuid FOR UPDATE`;
     const op = await tx.providerOperation.findFirstOrThrow({
@@ -526,7 +732,9 @@ export class IntegrationsService implements OnModuleInit {
             ? 'The provider did not confirm the result. Do NOT repeat this transaction. CSP2All will check the status automatically.'
             : op.status === 'PENDING'
               ? 'The provider is still processing this request.'
-              : null,
+              : op.status === 'FAILED'
+                ? (op.lastError ?? 'The provider reported this transaction as failed.')
+                : null,
         providerRef: op.providerRef,
         idempotencyKey: op.idempotencyKey,
         record: await this.records.toJson(ctx, rec, tx),
@@ -584,12 +792,11 @@ export class IntegrationsService implements OnModuleInit {
   ) {
     if (!rawBody) throw new AppError('VALIDATION_FAILED', 'Empty body');
     const bodyHash = sha256(rawBody);
+    // Pay2All callbacks use the per-shop URL (handlePay2AllCallback): they carry no signature.
     const adapter: ProviderAdapter | null =
       provider === 'simulator'
-        ? this.adapterFor({ mode: 'SIMULATOR' })
-        : provider === 'pay2all'
-          ? this.pay2all
-          : null;
+        ? this.adapterFor({ mode: 'SIMULATOR', credentialsEnc: null })
+        : null;
     if (!adapter) throw notFound('Webhook endpoint');
     const v = adapter.verifyWebhook(rawBody, headers);
     if (!v.valid || !v.deliveryId || !v.event) {
@@ -644,6 +851,93 @@ export class IntegrationsService implements OnModuleInit {
     });
   }
 
+  /**
+   * Pay2All callback (POST /v1/webhooks/pay2all/:token). Pay2All does not sign callbacks, so:
+   *  - the shop is identified by an unguessable token in its own callback URL,
+   *  - the body must name one of that shop's pending operations (client_id = our idempotency key),
+   *  - bill payments are re-checked with Pay2All's status API instead of trusting the body,
+   *  - a recharge result is accepted only if the amount matches what we sent.
+   */
+  async handlePay2AllCallback(token: string, rawBody: Buffer | undefined, body: unknown) {
+    const bodyHash = sha256(rawBody ?? JSON.stringify(body ?? {}));
+    const cfg = /^[\w-]{16,64}$/.test(token)
+      ? await this.db.asSystem((tx) =>
+          tx.connectorConfig.findUnique({ where: { webhookToken: token } }),
+        )
+      : null;
+    const reject = async (reason: string, tenantId: string | null = null) => {
+      await this.db.asSystem((tx) =>
+        tx.webhookReceipt.create({
+          data: {
+            provider: 'pay2all',
+            deliveryId: `rejected:${bodyHash}:${Date.now()}`,
+            tenantId,
+            signatureValid: false,
+            rawBodySha256: bodyHash,
+            status: 'REJECTED',
+            error: reason,
+          },
+        }),
+      );
+      return { ok: false };
+    };
+    if (!cfg) {
+      await reject('unknown callback token');
+      throw notFound('Webhook endpoint');
+    }
+    const cb = parsePay2AllCallback(body);
+    if (!cb) return reject('malformed body', cfg.tenantId);
+    const tctx = { tenantId: cfg.tenantId, userId: SYSTEM_USER };
+    const op = await this.db.inTenant(tctx, (tx) =>
+      tx.providerOperation.findUnique({
+        where: { tenantId_idempotencyKey: { tenantId: cfg.tenantId, idempotencyKey: cb.clientId } },
+      }),
+    );
+    if (!op || op.mode === 'SIMULATOR') return reject('unknown client_id', cfg.tenantId);
+    const rec = await this.db.inTenant(tctx, (tx) =>
+      tx.serviceRecord.findFirstOrThrow({ where: { id: op.recordId, tenantId: cfg.tenantId } }),
+    );
+    let status: ProviderResultStatus = cb.status;
+    let providerRef = cb.providerRef;
+    if (rec.serviceCode === 'BILL_PAYMENT') {
+      const adapter = this.adapterFor({ mode: op.mode, credentialsEnc: cfg.credentialsEnc });
+      const s = adapter ? await adapter.queryStatus(op.idempotencyKey, 'BILL_PAYMENT') : null;
+      if (!s || s.status === 'NOT_FOUND')
+        return reject('not confirmed by status API', cfg.tenantId);
+      status = s.status;
+      providerRef = s.providerRef ?? providerRef;
+    } else if (cb.amountPaise !== undefined && BigInt(cb.amountPaise) !== rec.principalPaise) {
+      return reject('amount mismatch', cfg.tenantId);
+    }
+    // De-duplicate on the verified outcome, so a re-sent callback after settlement still applies.
+    const deliveryId = `${cb.clientId}:${status}:${providerRef ?? ''}`;
+    const dup = await this.db.asSystem((tx) =>
+      tx.webhookReceipt.findUnique({
+        where: { provider_deliveryId: { provider: 'pay2all', deliveryId } },
+      }),
+    );
+    if (dup) return { ok: true, duplicate: true };
+    await this.db.inTenant(tctx, async (tx) => {
+      await tx.webhookReceipt.create({
+        data: {
+          provider: 'pay2all',
+          deliveryId,
+          tenantId: cfg.tenantId,
+          signatureValid: false,
+          rawBodySha256: bodyHash,
+          payload: { status, providerRef: providerRef ?? null, utr: cb.utr ?? null },
+          status: 'PROCESSED',
+          processedAt: new Date(),
+        },
+      });
+      await this.applyStatus(tx, cfg.tenantId, op.id, status, 'WEBHOOK', {
+        providerRef,
+        operatorRef: cb.utr,
+      });
+    });
+    return { ok: true, duplicate: false };
+  }
+
   async reconcileAll(onlyTenant?: string) {
     const ops = await this.db.asSystem((tx) =>
       tx.providerOperation.findMany({
@@ -678,13 +972,27 @@ export class IntegrationsService implements OnModuleInit {
       tx.reconciliationRun.create({ data: { tenantId, provider: 'PAY2ALL', status: 'RUNNING' } }),
     );
     const stats = { checked: 0, resolved: 0, exceptions: 0 };
+    const cfg = await this.db.inTenant(tctx, (tx) => this.loadConfig(tx, tenantId));
     for (const op of ops) {
       if (op.status === 'CONFIRMED' || op.status === 'FAILED') continue;
-      const adapter = this.adapterFor({ mode: op.mode === 'SIMULATOR' ? 'SIMULATOR' : 'LIVE' });
+      // Ask in the mode the operation was sent in, with the shop's current credentials.
+      const adapter = this.adapterFor({
+        mode: op.mode === 'SIMULATOR' ? 'SIMULATOR' : op.mode === 'UAT' ? 'UAT' : 'LIVE',
+        credentialsEnc: cfg?.credentialsEnc ?? null,
+      });
       if (!adapter) continue;
       stats.checked++;
       try {
-        const s = await adapter.queryStatus(op.idempotencyKey);
+        const rec = await this.db.inTenant(tctx, (tx) =>
+          tx.serviceRecord.findFirst({
+            where: { id: op.recordId, tenantId },
+            select: { serviceCode: true },
+          }),
+        );
+        const s = await adapter.queryStatus(
+          op.idempotencyKey,
+          rec?.serviceCode as ServiceCode | undefined,
+        );
         await this.db.inTenant(tctx, async (tx) => {
           if (s.status === 'NOT_FOUND') {
             // Provider confirms it never received the request: safe to mark failed (no money moved).

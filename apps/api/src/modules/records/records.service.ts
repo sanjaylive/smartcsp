@@ -24,6 +24,7 @@ import {
 import type { z } from 'zod';
 import { Db, nextCounter, type TenantCtx, type Tx } from '../../common/db';
 import { AppError, notFound, versionConflict, zodToAppError } from '../../common/errors';
+import { PaymentAccountsService } from '../payment-accounts/payment-accounts.service';
 import { MastersService } from '../masters/masters.service';
 import { buildReceipt } from './receipt';
 import { AuditService } from '../../common/audit';
@@ -78,6 +79,7 @@ export class RecordsService {
     private readonly availability: ServiceAvailabilityService,
     private readonly audit: AuditService,
     private readonly masters: MastersService,
+    private readonly paymentAccounts: PaymentAccountsService,
   ) {}
 
   private async resolveService(
@@ -263,6 +265,12 @@ export class RecordsService {
         dto.paymentMethod,
       );
       const provider = await this.masters.resolveProvider(tx, ctx, dto.provider);
+      const paymentAccountId = await this.paymentAccounts.resolveForRecord(
+        tx,
+        ctx,
+        dto.paymentAccountId,
+        dto.paymentMethod,
+      );
 
       await this.entitlements.consumeRecordQuota(tx, ctx.tenantId, ctx.timezone);
       const branch = await tx.branch.findFirstOrThrow({
@@ -287,6 +295,7 @@ export class RecordsService {
           paymentMethod: dto.paymentMethod,
           principalMethod: dto.principalMethod,
           paymentMode,
+          paymentAccountId,
           provider,
           amountCollectedPaise: amounts.collected,
           amountDuePaise: due,
@@ -614,6 +623,18 @@ export class RecordsService {
         dto.provider !== undefined
           ? await this.masters.resolveProvider(tx, ctx, dto.provider)
           : undefined;
+      // Same rule as the payment mode: a changed method drops the old receiving account.
+      const paymentAccountId =
+        dto.paymentAccountId !== undefined
+          ? await this.paymentAccounts.resolveForRecord(
+              tx,
+              ctx,
+              dto.paymentAccountId,
+              amounts.paymentMethod,
+            )
+          : dto.paymentMethod && dto.paymentMethod !== rec.paymentMethod
+            ? null
+            : undefined;
       const paid = amounts.collected + rec.amountAllocatedPaise;
       if (paid > receivable)
         throw new AppError('AMOUNT_EXCEEDS_DUE', 'Collections exceed the new amount owed');
@@ -640,6 +661,7 @@ export class RecordsService {
           paymentMethod: amounts.paymentMethod,
           principalMethod: amounts.principalMethod,
           paymentMode,
+          paymentAccountId,
           provider,
           principalDirection: direction,
           amountDuePaise: receivable - paid,
@@ -867,6 +889,7 @@ export class RecordsService {
       receivedCommissionPaise: n(r.receivedCommissionPaise),
       paymentMethod: r.paymentMethod,
       paymentMode: r.paymentMode,
+      paymentAccountId: r.paymentAccountId,
       provider: r.provider,
       principalMethod: r.principalMethod,
       amountCollectedPaise: n(r.amountCollectedPaise),

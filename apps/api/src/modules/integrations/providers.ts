@@ -12,11 +12,15 @@ export interface ExecuteRequest {
   amountPaise: number;
   /** Already-validated, minimal record details. Never contains biometrics, PINs or card data. */
   details: Record<string, unknown>;
+  /** Provider-specific ids chosen on screen (operator id, biller id, bill reference…). */
+  live?: Record<string, unknown>;
 }
 
 export interface ExecuteResult {
   status: ProviderResultStatus;
   providerRef?: string;
+  /** Operator / bank reference (UTR) when the provider returns one. */
+  operatorRef?: string;
   message?: string;
 }
 
@@ -56,62 +60,15 @@ export interface ProviderAdapter {
   readonly id: string;
   readonly mode: 'SIMULATOR' | 'LIVE';
   supports(service: ServiceCode): boolean;
-  health(): Promise<{ ok: boolean; detail: string }>;
+  health(): Promise<{ ok: boolean; detail: string; balancePaise?: number | null }>;
   execute(req: ExecuteRequest, timeoutMs: number): Promise<ExecuteResult>;
-  queryStatus(idempotencyKey: string): Promise<StatusResult>;
+  queryStatus(idempotencyKey: string, service?: ServiceCode): Promise<StatusResult>;
   /** Look up the account holder's name before a transfer. */
   verifyAccount(req: AccountVerifyRequest, timeoutMs: number): Promise<AccountVerifyResult>;
   verifyWebhook(
     rawBody: Buffer,
     headers: Record<string, string | string[] | undefined>,
   ): WebhookVerification;
-}
-
-export const PAY2ALL_MISSING = [
-  'Official Pay2All API documentation (base URLs, endpoints, request/response schemas)',
-  'Authentication and request-signing specification',
-  'Supported services and per-service operation semantics',
-  'Idempotency / duplicate-request behaviour and status-query endpoint',
-  'Webhook delivery, signature and retry specification',
-  'Sandbox credentials and test cases',
-  'Production credentials, IP allow-listing and any required approvals',
-];
-
-/**
- * Pay2All adapter — intentionally DISABLED. No official documentation or credentials were supplied,
- * so no endpoints, payloads or signing rules are implemented. See docs/PAY2ALL_READINESS.md.
- */
-export class Pay2AllAdapter implements ProviderAdapter {
-  readonly id = 'PAY2ALL';
-  readonly mode = 'LIVE' as const;
-  private unavailable(): never {
-    throw new AppError(
-      'CONNECTOR_UNAVAILABLE',
-      'The Pay2All connector is not available: official documentation and credentials have not been provided.',
-      { missing: PAY2ALL_MISSING },
-    );
-  }
-  supports(): boolean {
-    return false;
-  }
-  async health() {
-    return {
-      ok: false,
-      detail: 'Disabled: awaiting official Pay2All documentation and credentials',
-    };
-  }
-  async execute(): Promise<ExecuteResult> {
-    this.unavailable();
-  }
-  async queryStatus(): Promise<StatusResult> {
-    this.unavailable();
-  }
-  async verifyAccount(): Promise<AccountVerifyResult> {
-    this.unavailable();
-  }
-  verifyWebhook(): WebhookVerification {
-    return { valid: false, reason: 'Pay2All webhooks are not enabled' };
-  }
 }
 
 /**

@@ -39,10 +39,14 @@ describe('Pay2All connector boundary and simulator', () => {
     ({ client: c, tenantId } = await onboard(t, ['RECHARGE', 'AEPS']));
   });
 
-  it('is unavailable until entitled, configured and permitted; live Pay2All stays disabled', async () => {
+  it('is unavailable until entitled, configured and permitted; Live needs an API token', async () => {
     const ov = (await c.get('/v1/integrations').expect(200)).body.providers[0];
-    expect(ov).toMatchObject({ mode: 'DISABLED', liveAvailable: false });
-    expect(ov.missing.length).toBeGreaterThan(3);
+    expect(ov).toMatchObject({
+      mode: 'DISABLED',
+      liveAvailable: true,
+      liveServices: ['RECHARGE', 'BILL_PAYMENT'],
+      pendingServices: ['DMT', 'AEPS'],
+    });
     expect(
       (await c.post('/v1/provider-operations', rechargeOp(10000), 'op-key-blocked-1').expect(409))
         .body.error.code,

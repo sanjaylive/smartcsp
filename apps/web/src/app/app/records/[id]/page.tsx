@@ -58,6 +58,7 @@ import {
   useServiceLabel,
 } from '@/components/service';
 import { useToast } from '@/components/ui/toast';
+import { PaidInto } from '@/components/payment-collect';
 import { cn } from '@/lib/cn';
 
 export default function RecordDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -280,6 +281,9 @@ function RecordView({ r, refetch }: { r: RecordDetail; refetch: () => void }) {
                       </span>
                     ),
                   },
+                  r.paymentAccountId
+                    ? { label: 'Paid into', value: <PaidInto id={r.paymentAccountId} /> }
+                    : null,
                   r.amountAllocatedPaise
                     ? {
                         label: t('recordDetail.collectedLater'),

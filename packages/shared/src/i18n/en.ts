@@ -100,6 +100,7 @@ export const en = {
   'nav.shop': 'Shop profile',
   'nav.services': 'Services',
   'nav.masters': 'Masters',
+  'nav.payments': 'Payment accounts',
   'nav.integrations': 'Integrations',
   'nav.notifications': 'Notifications',
   'nav.security': 'Security',
