@@ -460,6 +460,28 @@ export const SERVICE_REGISTRY: Record<ServiceCode, ServiceDefinition> = {
   },
 };
 
+/** Recharge operators that apply to each recharge type. A type not listed shows every operator. */
+export const RECHARGE_OPERATORS_BY_TYPE: Record<string, readonly string[]> = {
+  PREPAID: ['AIRTEL', 'JIO', 'VI', 'BSNL', 'OTHER'],
+  DATACARD: ['AIRTEL', 'JIO', 'VI', 'BSNL', 'OTHER'],
+  DTH: ['TATA_PLAY', 'DISH_TV', 'AIRTEL_DTH', 'SUN_DIRECT', 'D2H', 'OTHER'],
+  FASTAG: ['OTHER'],
+};
+
+/** Options to offer for `field` given the form's other values (e.g. operators for the chosen recharge type). */
+export function visibleFieldOptions(
+  field: FieldDef,
+  values: Record<string, unknown>,
+): NonNullable<FieldDef['options']> {
+  const all = field.options ?? [];
+  if (field.key === 'operator') {
+    const type = values.rechargeType;
+    const allowed = typeof type === 'string' ? RECHARGE_OPERATORS_BY_TYPE[type] : undefined;
+    if (allowed) return all.filter((o) => allowed.includes(o.value));
+  }
+  return all;
+}
+
 export const SELECTABLE_SERVICES: ServiceCode[] = [...SERVICE_CODES];
 
 // ---------------------------------------------------------------------------

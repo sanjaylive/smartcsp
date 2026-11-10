@@ -196,7 +196,7 @@ export const hi: Record<TranslationKey, string> = {
   'service.BILL_PAYMENT.description': 'बिजली, पानी, गैस और अन्य बिल',
   'service.PAN.name': 'PAN सेवाएँ',
   'service.PAN.description': 'PAN आवेदन और सुधार ट्रैक करें',
-  'service.AADHAAR.name': 'आधार केंद्र रिकॉर्ड',
+  'service.AADHAAR.name': 'आधार केंद्र',
   'service.AADHAAR.description': 'अपॉइंटमेंट और अपडेट अनुरोध (आधार नंबर संग्रहित नहीं)',
   'service.DOCUMENT.name': 'दस्तावेज़ जमा',
   'service.DOCUMENT.description': 'प्रमाणपत्र और अन्य विभागीय आवेदन',

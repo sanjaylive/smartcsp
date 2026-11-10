@@ -95,6 +95,23 @@ class ServiceDefinition {
 
 List<FieldOption> _opt(List<String> values, String prefix) => [for (final v in values) FieldOption(v, '$prefix.$v')];
 
+/// Recharge operators that apply to each recharge type. A type not listed here shows every operator.
+const Map<String, List<String>> rechargeOperatorsByType = {
+  'PREPAID': ['AIRTEL', 'JIO', 'VI', 'BSNL', 'OTHER'],
+  'DATACARD': ['AIRTEL', 'JIO', 'VI', 'BSNL', 'OTHER'],
+  'DTH': ['TATA_PLAY', 'DISH_TV', 'AIRTEL_DTH', 'SUN_DIRECT', 'D2H', 'OTHER'],
+  'FASTAG': ['OTHER'],
+};
+
+/// Options to offer for [field] given the other values on the form (e.g. operators for the chosen recharge type).
+List<FieldOption> visibleOptions(FieldDef field, Map<String, Object?> values) {
+  if (field.key == 'operator') {
+    final allowed = rechargeOperatorsByType[values['rechargeType']];
+    if (allowed != null) return [for (final o in field.options) if (allowed.contains(o.value)) o];
+  }
+  return field.options;
+}
+
 const aepsOperations = ['CASH_WITHDRAWAL', 'BALANCE_ENQUIRY', 'MINI_STATEMENT', 'CASH_DEPOSIT'];
 const microAtmOperations = ['CASH_WITHDRAWAL', 'BALANCE_ENQUIRY'];
 

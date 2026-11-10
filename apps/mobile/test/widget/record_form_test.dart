@@ -78,7 +78,7 @@ void main() {
     final adapter = _server();
     await pumpForm(tester, adapter);
 
-    expect(find.text('New Money Transfer (DMT) record'), findsOneWidget);
+    expect(find.text('Money Transfer (DMT)'), findsOneWidget);
     expect(find.byKey(const Key('field.beneficiaryName')), findsOneWidget);
     expect(find.byKey(const Key('field.accountNumber')), findsOneWidget);
     expect(find.byKey(const Key('field.ifsc')), findsOneWidget);

@@ -44,6 +44,8 @@ import {
   initialStatuses,
   isPostableStatus,
   recordCreateSchema,
+  RECHARGE_OPERATORS_BY_TYPE,
+  visibleFieldOptions,
   type CustomFieldDef,
   type FieldDef,
   type OpStatus,
@@ -287,7 +289,7 @@ export function RecordWizard({
   }
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div>
       <PageTop
         icon={<NewIcon />}
         title={t('nav.newRecord')}
@@ -364,7 +366,7 @@ function ServiceGrid({
         </div>
       ) : null}
       {items.length ? (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[1900px]:grid-cols-5">
           {items.map((i) => (
             <li key={i.key}>
               <button
@@ -838,13 +840,26 @@ function RecordSteps({
       key={f.key}
       field={f}
       value={details[f.key]}
+      options={visibleFieldOptions(f, details)}
       labelOverride={svc.code === 'CUSTOM' ? f.labelKey : undefined}
       onChange={(v) => {
-        setDetails((d) => ({
-          ...d,
-          [f.key]: v,
-          ...(f.key === 'senderName' ? { senderNameTouched: true } : {}),
-        }));
+        setDetails((d) => {
+          const next = {
+            ...d,
+            [f.key]: v,
+            ...(f.key === 'senderName' ? { senderNameTouched: true } : {}),
+          };
+          // A new recharge type drops an operator that doesn't belong to it (or picks the only one).
+          const allowed =
+            f.key === 'rechargeType' && typeof v === 'string'
+              ? RECHARGE_OPERATORS_BY_TYPE[v]
+              : undefined;
+          if (allowed && 'operator' in next) {
+            if (!allowed.includes(String(next.operator))) next.operator = '';
+            if (allowed.length === 1) next.operator = allowed[0]!;
+          }
+          return next;
+        });
         clearErr(`details.${f.key}`);
       }}
       error={errs.get(`details.${f.key}`)}
@@ -1012,10 +1027,10 @@ function RecordSteps({
   );
 
   return (
-    <div className="mx-auto max-w-6xl pb-20 lg:pb-0">
+    <div className="pb-20 lg:pb-0">
       <PageTop
         icon={<ServiceIcon code={svc.code} size="lg" />}
-        title={t('record.new', { service: svc.name })}
+        title={svc.name}
         description={t('record.manualNotice')}
         backHref="/app/records"
         backLabel={t('nav.records')}
@@ -1026,7 +1041,7 @@ function RecordSteps({
         }
       />
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_370px]">
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
         <form
           ref={formRef}
           noValidate

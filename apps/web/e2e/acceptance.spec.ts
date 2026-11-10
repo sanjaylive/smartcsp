@@ -111,7 +111,7 @@ test('5. add a customer and a manual AEPS record', async () => {
   ids.customer = page.url().split('/').pop();
 
   await page.goto('/app/records/new?service=AEPS');
-  await expect(page.getByRole('heading', { name: 'New AEPS record' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'AEPS', exact: true })).toBeVisible();
   await expect(page.getByText('This is a manual record entered by your shop')).toBeVisible();
   await page.getByRole('combobox', { name: 'Find a customer' }).fill(customerName.split(' ')[0]);
   await page.getByRole('option').getByRole('button', { name: customerName }).click();
