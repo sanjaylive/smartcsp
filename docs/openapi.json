@@ -2508,6 +2508,12 @@
                     "type": "string",
                     "maxLength": 60
                   },
+                  "paymentAccountId": {
+                    "nullable": true,
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
                   "assignedToUserId": {
                     "nullable": true,
                     "type": "string",
@@ -2733,6 +2739,12 @@
                     "nullable": true,
                     "type": "string",
                     "maxLength": 60
+                  },
+                  "paymentAccountId": {
+                    "nullable": true,
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
                   "assignedToUserId": {
                     "nullable": true,
@@ -2966,6 +2978,12 @@
                     "nullable": true,
                     "type": "string",
                     "maxLength": 40
+                  },
+                  "paymentAccountId": {
+                    "nullable": true,
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
                   "provider": {
                     "nullable": true,
@@ -8045,7 +8063,7 @@
     },
     "/v1/integrations/pay2all": {
       "put": {
-        "summary": "Configure the Pay2All connector (DISABLED or SIMULATOR; credentials are write-only)",
+        "summary": "Configure Pay2All: mode (DISABLED = all Offline, UAT test, LIVE), API token (write-only) and Live services",
         "tags": [
           "Integrations"
         ],
@@ -8093,7 +8111,9 @@
                     "type": "string",
                     "enum": [
                       "DISABLED",
-                      "SIMULATOR"
+                      "SIMULATOR",
+                      "UAT",
+                      "LIVE"
                     ]
                   },
                   "credentials": {
@@ -8525,6 +8545,12 @@
                     "type": "string",
                     "maxLength": 60
                   },
+                  "paymentAccountId": {
+                    "nullable": true,
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
                   "assignedToUserId": {
                     "nullable": true,
                     "type": "string",
@@ -8550,6 +8576,39 @@
                     "enum": [
                       true
                     ]
+                  },
+                  "live": {
+                    "type": "object",
+                    "properties": {
+                      "providerId": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "exclusiveMinimum": true,
+                        "maximum": 9007199254740991
+                      },
+                      "billerId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "referenceId": {
+                        "nullable": true,
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "params": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "string",
+                          "maxLength": 128
+                        }
+                      },
+                      "mobile": {
+                        "nullable": true,
+                        "type": "string",
+                        "pattern": "^[6-9]\\d{9}$"
+                      }
+                    }
                   }
                 },
                 "required": [
@@ -8696,6 +8755,495 @@
         "x-permissions": [
           "integrations.manage"
         ]
+      }
+    },
+    "/v1/pay2all/providers": {
+      "get": {
+        "summary": "Pay2All operators by service (cached)",
+        "tags": [
+          "Pay2All"
+        ],
+        "operationId": "Integrations_p2aProviders",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "records.create"
+        ]
+      }
+    },
+    "/v1/pay2all/lookup": {
+      "post": {
+        "summary": "Find the operator and circle of a mobile / DTH number",
+        "tags": [
+          "Pay2All"
+        ],
+        "operationId": "Integrations_p2aLookup",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "number": {
+                    "type": "string",
+                    "pattern": "^\\d{6,20}$"
+                  },
+                  "type": {
+                    "default": "mobile",
+                    "type": "string",
+                    "enum": [
+                      "mobile",
+                      "dth"
+                    ]
+                  }
+                },
+                "required": [
+                  "number"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "records.create"
+        ]
+      }
+    },
+    "/v1/pay2all/plans": {
+      "get": {
+        "summary": "Recharge plans for an operator (and circle)",
+        "tags": [
+          "Pay2All"
+        ],
+        "operationId": "Integrations_p2aPlans",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "records.create"
+        ]
+      }
+    },
+    "/v1/pay2all/bbps/categories": {
+      "get": {
+        "summary": "Bill payment categories",
+        "tags": [
+          "Pay2All"
+        ],
+        "operationId": "Integrations_p2aBbpsCategories",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "records.create"
+        ]
+      }
+    },
+    "/v1/pay2all/bbps/billers": {
+      "get": {
+        "summary": "Billers in a bill payment category",
+        "tags": [
+          "Pay2All"
+        ],
+        "operationId": "Integrations_p2aBbpsBillers",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "records.create"
+        ]
+      }
+    },
+    "/v1/pay2all/bbps/billers/{billerId}": {
+      "get": {
+        "summary": "The inputs a biller needs",
+        "tags": [
+          "Pay2All"
+        ],
+        "operationId": "Integrations_p2aBbpsBiller",
+        "parameters": [
+          {
+            "name": "billerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "records.create"
+        ]
+      }
+    },
+    "/v1/pay2all/bbps/fetch": {
+      "post": {
+        "summary": "Fetch the customer’s current bill (no payment)",
+        "tags": [
+          "Pay2All"
+        ],
+        "operationId": "Integrations_p2aBbpsFetch",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "billerId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "maxLength": 128
+                    }
+                  },
+                  "mobile": {
+                    "type": "string",
+                    "pattern": "^[6-9]\\d{9}$"
+                  }
+                },
+                "required": [
+                  "billerId",
+                  "params",
+                  "mobile"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "records.create"
+        ]
+      }
+    },
+    "/v1/webhooks/pay2all/{token}": {
+      "post": {
+        "summary": "Pay2All status callback for one shop (unsigned by Pay2All: matched by secret URL, re-verified)",
+        "tags": [
+          "Integrations"
+        ],
+        "operationId": "Integrations_pay2allCallback",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
       }
     },
     "/v1/webhooks/{provider}": {
@@ -12404,6 +12952,405 @@
                 "required": [
                   "version"
                 ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "settings.manage"
+        ]
+      }
+    },
+    "/v1/payment-accounts": {
+      "get": {
+        "summary": "The shop’s own UPI IDs and bank accounts that customers pay into",
+        "tags": [
+          "Payment accounts"
+        ],
+        "operationId": "PaymentAccounts_list",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": []
+      },
+      "post": {
+        "summary": "Add a UPI ID or bank account (upload a QR image afterwards with ownerType PAYMENT_QR)",
+        "tags": [
+          "Payment accounts"
+        ],
+        "operationId": "PaymentAccounts_create",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "UPI"
+                        ]
+                      },
+                      "label": {
+                        "type": "string",
+                        "maxLength": 40
+                      },
+                      "upiId": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "payeeName": {
+                        "nullable": true,
+                        "type": "string",
+                        "maxLength": 60
+                      },
+                      "upiApp": {
+                        "default": "OTHER",
+                        "type": "string",
+                        "enum": [
+                          "PHONEPE",
+                          "PAYTM",
+                          "GPAY",
+                          "BHIM",
+                          "BHARATPE",
+                          "AMAZONPAY",
+                          "OTHER"
+                        ]
+                      },
+                      "isDefault": {
+                        "default": false,
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "label"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "BANK"
+                        ]
+                      },
+                      "label": {
+                        "type": "string",
+                        "maxLength": 40
+                      },
+                      "holderName": {
+                        "type": "string",
+                        "maxLength": 80
+                      },
+                      "bankName": {
+                        "type": "string",
+                        "maxLength": 80
+                      },
+                      "accountNumber": {
+                        "type": "string"
+                      },
+                      "ifsc": {
+                        "type": "string"
+                      },
+                      "accountType": {
+                        "default": "CURRENT",
+                        "type": "string",
+                        "enum": [
+                          "CURRENT",
+                          "SAVINGS"
+                        ]
+                      },
+                      "isDefault": {
+                        "default": false,
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "label",
+                      "holderName",
+                      "bankName",
+                      "accountNumber",
+                      "ifsc"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "settings.manage"
+        ]
+      }
+    },
+    "/v1/payment-accounts/{id}": {
+      "patch": {
+        "summary": "Edit, make default or switch off a payment account",
+        "tags": [
+          "Payment accounts"
+        ],
+        "operationId": "PaymentAccounts_update",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "upiId": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "payeeName": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "upiApp": {
+                    "type": "string",
+                    "enum": [
+                      "PHONEPE",
+                      "PAYTM",
+                      "GPAY",
+                      "BHIM",
+                      "BHARATPE",
+                      "AMAZONPAY",
+                      "OTHER"
+                    ]
+                  },
+                  "holderName": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "bankName": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "accountNumber": {
+                    "type": "string"
+                  },
+                  "ifsc": {
+                    "type": "string"
+                  },
+                  "accountType": {
+                    "type": "string",
+                    "enum": [
+                      "CURRENT",
+                      "SAVINGS"
+                    ]
+                  },
+                  "isDefault": {
+                    "type": "boolean"
+                  },
+                  "active": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "version"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permissions": [
+          "settings.manage"
+        ]
+      },
+      "delete": {
+        "summary": "Delete a payment account (switched off instead if records already use it)",
+        "tags": [
+          "Payment accounts"
+        ],
+        "operationId": "PaymentAccounts_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error with stable code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           }
