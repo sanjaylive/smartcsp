@@ -152,12 +152,13 @@ model Tenant {
   updatedAt            DateTime @updatedAt
   version              Int      @default(0)
 
-  branches      Branch[]
-  memberships   Membership[]
-  services      TenantService[]
-  subscription  Subscription?
-  customDomains CustomDomain[]
-  masters       ShopMaster[]
+  branches        Branch[]
+  memberships     Membership[]
+  services        TenantService[]
+  subscription    Subscription?
+  customDomains   CustomDomain[]
+  masters         ShopMaster[]
+  paymentAccounts PaymentAccount[]
 
   @@map("tenants")
 }
@@ -181,6 +182,37 @@ model ShopMaster {
   @@unique([tenantId, kind, name])
   @@index([tenantId, kind])
   @@map("shop_masters")
+}
+
+/// The shop's own receiving accounts: UPI IDs (optionally with an uploaded QR) and bank accounts.
+model PaymentAccount {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  tenantId       String   @db.Uuid
+  kind           String // UPI | BANK
+  label          String
+  upiId          String?
+  upiApp         String? // PHONEPE | PAYTM | GPAY | BHIM | BHARATPE | AMAZONPAY | OTHER
+  payeeName      String?
+  holderName     String?
+  bankName       String?
+  accountNumber  String?
+  ifsc           String?
+  accountType    String? // CURRENT | SAVINGS
+  qrAttachmentId String?  @db.Uuid
+  isDefault      Boolean  @default(false)
+  active         Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  version        Int      @default(0)
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  records ServiceRecord[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, label])
+  @@index([tenantId, kind])
+  @@map("payment_accounts")
 }
 
 model CustomDomain {
@@ -376,6 +408,7 @@ model ServiceRecord {
   amountDuePaise          BigInt    @default(0)
   externalRef             String?
   paymentMode             String? // shop-defined label, e.g. "PhonePe" (paymentMethod keeps the ledger meaning)
+  paymentAccountId        String?   @db.Uuid // the shop's UPI ID / bank account the customer paid into
   provider                String? // shop-defined provider / portal name
   assignedToUserId        String?   @db.Uuid
   notes                   String?
@@ -394,10 +427,11 @@ model ServiceRecord {
   updatedAt               DateTime  @updatedAt
   version                 Int       @default(0)
 
-  customer      Customer?                @relation(fields: [tenantId, customerId], references: [tenantId, id], onDelete: Restrict)
-  customService CustomServiceDefinition? @relation(fields: [tenantId, customServiceId], references: [tenantId, id], onDelete: Restrict)
-  events        RecordStatusEvent[]
-  allocations   PaymentAllocation[]
+  customer       Customer?                @relation(fields: [tenantId, customerId], references: [tenantId, id], onDelete: Restrict)
+  customService  CustomServiceDefinition? @relation(fields: [tenantId, customServiceId], references: [tenantId, id], onDelete: Restrict)
+  paymentAccount PaymentAccount?          @relation(fields: [tenantId, paymentAccountId], references: [tenantId, id], onDelete: Restrict, map: "service_records_paymentAccount_fkey")
+  events         RecordStatusEvent[]
+  allocations    PaymentAllocation[]
 
   @@unique([tenantId, id])
   @@unique([tenantId, recordNo])
@@ -797,6 +831,8 @@ model ConnectorConfig {
   enabledServices   String[]  @default([])
   lastHealthAt      DateTime?
   lastHealthStatus  String?
+  /// Secret path segment of this shop's callback URL (Pay2All does not sign callbacks).
+  webhookToken      String?   @unique
   updatedByUserId   String?   @db.Uuid
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt

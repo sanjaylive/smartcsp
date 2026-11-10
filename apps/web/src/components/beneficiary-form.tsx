@@ -67,7 +67,7 @@ export function useAccountVerify() {
   });
 }
 
-function BankPicker({
+export function BankPicker({
   id,
   value,
   onChange,

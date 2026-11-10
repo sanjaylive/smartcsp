@@ -30,6 +30,7 @@ class ServiceAvailability {
     required this.hasHistory,
     this.reason,
     required this.workflowType,
+    this.liveAvailable = false,
   });
 
   final String code;
@@ -41,6 +42,9 @@ class ServiceAvailability {
   final String? reason;
   final WorkflowType workflowType;
 
+  /// The owner set this service to Live (Pay2All) and this user may run it.
+  final bool liveAvailable;
+
   factory ServiceAvailability.fromJson(Json j) => ServiceAvailability(
         code: str(j, 'code'),
         selected: boolOf(j, 'selected'),
@@ -48,6 +52,7 @@ class ServiceAvailability {
         hasHistory: boolOf(j, 'hasHistory'),
         reason: strOrNull(j, 'reason'),
         workflowType: workflowFromApi(strOrNull(j, 'workflowType')),
+        liveAvailable: boolOf(asJson(j['providerExecution']), 'available'),
       );
 }
 
@@ -380,4 +385,55 @@ class AppNotification {
         readAt: strOrNull(j, 'readAt'),
         createdAt: str(j, 'createdAt'),
       );
+}
+
+/// One page of the notifications feed plus the shop-wide unread count.
+class NotificationsPage {
+  const NotificationsPage({required this.page, required this.unread});
+  final PageResult<AppNotification> page;
+  final int unread;
+
+  factory NotificationsPage.fromJson(Json j) =>
+      NotificationsPage(page: PageResult.fromJson(j, AppNotification.fromJson), unread: intOf(j, 'unread'));
+}
+
+/// A customer's saved DMT beneficiary.
+class Beneficiary {
+  const Beneficiary({
+    required this.id,
+    required this.name,
+    required this.bankName,
+    required this.accountNumber,
+    this.ifsc,
+    required this.active,
+    required this.version,
+  });
+  final String id;
+  final String name;
+  final String bankName;
+  final String accountNumber;
+  final String? ifsc;
+  final bool active;
+  final int version;
+
+  factory Beneficiary.fromJson(Json j) => Beneficiary(
+        id: str(j, 'id'),
+        name: str(j, 'name'),
+        bankName: str(j, 'bankName'),
+        accountNumber: str(j, 'accountNumber'),
+        ifsc: strOrNull(j, 'ifsc'),
+        active: j['active'] != false,
+        version: intOf(j, 'version'),
+      );
+}
+
+/// Result of a bank-account name lookup through the shop's connected provider.
+class AccountVerifyResult {
+  const AccountVerifyResult({required this.verified, this.name, this.message});
+  final bool verified;
+  final String? name;
+  final String? message;
+
+  factory AccountVerifyResult.fromJson(Json j) =>
+      AccountVerifyResult(verified: j['verified'] == true, name: strOrNull(j, 'name'), message: strOrNull(j, 'message'));
 }

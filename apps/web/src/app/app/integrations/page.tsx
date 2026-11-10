@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, CircleX, FlaskConical, PlugZap } from 'lucide-react';
+import { Activity, CircleX, FlaskConical, Hotel, Plane, PlugZap, Zap } from 'lucide-react';
 import { formatDateTime, type ServiceCode } from '@csp2all/shared';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
-import { errorMessage, usePermissions } from '@/lib/hooks';
+import { errorMessage, qk, usePermissions } from '@/lib/hooks';
 import type { IntegrationsOverview } from '@/lib/types';
 import {
   Alert,
@@ -15,13 +15,15 @@ import {
   ButtonLink,
   Card,
   CardHeader,
-  Checkbox,
+  Field,
+  Input,
   EmptyState,
   PageHeader,
   tableCls,
 } from '@/components/ui';
 import { QueryState } from '@/components/query-state';
-import { useServiceLabel } from '@/components/service';
+import { ServiceIcon, useServiceLabel } from '@/components/service';
+import { CopyText } from '@/components/payment-collect';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 
@@ -57,53 +59,15 @@ export default function IntegrationsPage() {
           <div className="flex flex-col gap-6">
             <Alert tone="info">{t('integrations.notice')}</Alert>
             {d.providers.map((p) => (
-              <div key={p.provider} className="grid gap-6 lg:grid-cols-2">
-                <Card>
-                  <CardHeader
-                    title={
-                      <span className="flex items-center gap-2">
-                        <PlugZap aria-hidden className="size-5" /> {t('integrations.pay2all')}
-                      </span>
-                    }
-                    actions={
-                      <Badge tone={p.mode === 'SIMULATOR' ? 'warning' : 'neutral'}>
-                        {tk(`connectorMode.${p.mode}`)}
-                      </Badge>
-                    }
-                  />
-                  <div className="flex flex-col gap-4 p-5">
-                    <Alert tone="warning" title={t('integrations.liveUnavailable')}>
-                      <span data-testid="live-unavailable">{t('integrations.liveReason')}</span>
-                    </Alert>
-                    <div>
-                      <h3 className="mb-2 font-bold">{t('integrations.readiness')}</h3>
-                      <ul className="flex flex-col gap-2" data-testid="readiness-list">
-                        {(Array.isArray(p.missing) ? (p.missing as string[]) : []).map((m) => (
-                          <li key={m} className="flex items-start gap-2 text-sm">
-                            <CircleX aria-hidden className="mt-0.5 size-4 shrink-0 text-danger" />
-                            <span>
-                              <span className="sr-only">{t('integrations.missing')}: </span>
-                              {m}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    <p className="text-sm text-fg-muted">
-                      {t('integrations.lastHealth')}:{' '}
-                      {p.lastHealthAt
-                        ? `${formatDateTime(p.lastHealthAt, ctx?.tenant.timezone)} · ${p.lastHealthStatus ?? ''}`
-                        : '—'}
-                    </p>
-                  </div>
-                </Card>
-                <SimulatorCard
-                  p={p}
-                  planAllows={d.planAllowsConnector}
-                  canManage={can('integrations.manage')}
-                />
-              </div>
+              <Pay2AllCard
+                key={p.provider}
+                p={p}
+                planAllows={d.planAllowsConnector}
+                canManage={can('integrations.manage')}
+                timezone={ctx?.tenant.timezone}
+              />
             ))}
+            <ComingSoon />
             <Card>
               <CardHeader
                 title={t('integrations.operations')}
@@ -164,27 +128,70 @@ export default function IntegrationsPage() {
   );
 }
 
-function SimulatorCard({
+type ConnMode = 'DISABLED' | 'UAT' | 'LIVE' | 'SIMULATOR';
+
+/**
+ * Pay2All settings: connection (Offline / Test / Live), API token, which services run Live,
+ * and the callback URL to paste into Pay2All.
+ */
+function Pay2AllCard({
   p,
   planAllows,
   canManage,
+  timezone,
 }: {
   p: IntegrationsOverview['providers'][number];
   planAllows: boolean;
   canManage: boolean;
+  timezone?: string;
 }) {
   const { t } = useI18n();
   const qc = useQueryClient();
   const toast = useToast();
   const label = useServiceLabel();
+  const { ctx } = usePermissions();
+  const [mode, setMode] = useState<ConnMode>(p.mode);
+  const [token, setToken] = useState('');
+  const [verifyId, setVerifyId] = useState('');
   const [services, setServices] = useState<ServiceCode[]>(p.enabledServices);
-  useEffect(() => setServices(p.enabledServices), [p.enabledServices]);
-  const configure = useMutation({
-    mutationFn: (mode: 'DISABLED' | 'SIMULATOR') =>
-      api('/v1/integrations/pay2all', { method: 'PUT', body: { mode, enabledServices: services } }),
+  const [balance, setBalance] = useState<string | null>(null);
+  useEffect(() => {
+    setMode(p.mode);
+    setServices(p.enabledServices);
+  }, [p.mode, p.enabledServices]);
+
+  const shopServices = new Set(ctx?.services.filter((s) => s.selected).map((s) => s.code) ?? []);
+  const rows: ServiceCode[] = [
+    ...p.liveServices,
+    ...p.pendingServices.filter((s) => !p.liveServices.includes(s)),
+  ].filter((s) => shopServices.has(s) || p.liveServices.includes(s));
+  const canLive = (s: ServiceCode) =>
+    mode === 'SIMULATOR'
+      ? p.supportedServices.includes(s)
+      : mode === 'UAT'
+        ? p.uatServices.includes(s)
+        : mode === 'LIVE'
+          ? p.liveServices.includes(s)
+          : false;
+
+  const save = useMutation({
+    mutationFn: () =>
+      api('/v1/integrations/pay2all', {
+        method: 'PUT',
+        body: {
+          mode,
+          enabledServices: services.filter(canLive),
+          credentials: {
+            ...(token.trim() ? { apiToken: token.trim() } : {}),
+            ...(verifyId.trim() ? { verifyProviderId: verifyId.trim() } : {}),
+          },
+        },
+      }),
     onSuccess: () => {
       toast('success', t('common.saved'));
+      setToken('');
       void qc.invalidateQueries({ queryKey: ['integrations'] });
+      void qc.invalidateQueries({ queryKey: qk.context });
     },
     onError: (e) => toast('error', errorMessage(t, e)),
   });
@@ -192,6 +199,7 @@ function SimulatorCard({
     mutationFn: () =>
       api<{ ok: boolean; detail?: string }>('/v1/integrations/pay2all/health', { method: 'POST' }),
     onSuccess: (r) => {
+      setBalance(r.ok ? (r.detail ?? null) : null);
       toast(
         r.ok ? 'success' : 'error',
         r.detail ?? (r.ok ? t('integrations.healthOk') : t('integrations.healthFail')),
@@ -200,90 +208,274 @@ function SimulatorCard({
     },
     onError: (e) => toast('error', errorMessage(t, e)),
   });
+
+  const modes: Array<{ v: ConnMode; title: string; text: string; icon: typeof PlugZap }> = [
+    { v: 'DISABLED', title: 'Offline', text: 'Every service is recorded by hand', icon: CircleX },
+    {
+      v: 'UAT',
+      title: 'Test (UAT)',
+      text: 'Pay2All sandbox — recharge only, no money moves',
+      icon: FlaskConical,
+    },
+    { v: 'LIVE', title: 'Live', text: 'Real transactions from your Pay2All wallet', icon: Zap },
+    ...(p.simulatorAvailable
+      ? [
+          {
+            v: 'SIMULATOR' as const,
+            title: 'Simulator',
+            text: 'Developers only — never calls Pay2All',
+            icon: FlaskConical,
+          },
+        ]
+      : []),
+  ];
+  const disabled = !canManage || !planAllows;
+
   return (
-    <Card className="border-2 border-dashed border-warning/60">
+    <Card>
       <CardHeader
         title={
           <span className="flex items-center gap-2">
-            <FlaskConical aria-hidden className="size-5 text-warning" />{' '}
-            {t('integrations.simulator')}
+            <span className="grid size-8 place-items-center rounded-lg bg-brand text-sm font-black text-on-brand">
+              P
+            </span>
+            Pay2All
           </span>
         }
-        description={t('integrations.simulatorHelp')}
+        description="Recharge and bill payment straight from this app, paid from your own Pay2All wallet."
+        actions={
+          <Badge
+            tone={p.mode === 'LIVE' ? 'success' : p.mode === 'DISABLED' ? 'neutral' : 'warning'}
+          >
+            {t(`connectorMode.${p.mode}` as never)}
+          </Badge>
+        }
       />
-      <div className="flex flex-col gap-4 p-5">
-        <Alert tone="warning" title={t('integrations.noMoneyTitle')}>
-          <span className="inline-flex items-start gap-2" data-testid="simulator-label">
-            {t('integrations.noMoney')}
-          </span>
-        </Alert>
-        {!p.simulatorAvailable ? (
-          <p className="text-sm text-fg-muted">{t('integrations.simulatorOff')}</p>
-        ) : null}
+      <div className="flex flex-col gap-6 p-5">
         {!planAllows ? (
-          <div className="flex flex-col items-start gap-2">
-            <p className="text-sm text-fg-muted">{t('integrations.planRequired')}</p>
-            <ButtonLink href="/app/subscription" variant="secondary">
-              {t('plan.upgrade')}
-            </ButtonLink>
+          <Alert
+            tone="warning"
+            title={t('integrations.planRequired')}
+            action={
+              <ButtonLink href="/app/subscription" variant="secondary">
+                {t('plan.upgrade')}
+              </ButtonLink>
+            }
+          />
+        ) : null}
+
+        <fieldset disabled={disabled}>
+          <legend className="mb-2 text-sm font-bold">1. Connection</legend>
+          <div
+            role="radiogroup"
+            aria-label="Connection"
+            className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4"
+          >
+            {modes.map((m) => {
+              const Icon = m.icon;
+              const on = mode === m.v;
+              return (
+                <button
+                  key={m.v}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => setMode(m.v)}
+                  className={cn(
+                    'flex items-start gap-3 rounded-xl border p-3 text-left transition disabled:opacity-60',
+                    on
+                      ? 'border-brand bg-brand-bg/60 ring-1 ring-brand'
+                      : 'border-border hover:border-brand/40',
+                  )}
+                >
+                  <Icon
+                    aria-hidden
+                    className={cn('mt-0.5 size-5 shrink-0', on ? 'text-brand' : 'text-fg-muted')}
+                  />
+                  <span>
+                    <span className="block text-sm font-bold">{m.title}</span>
+                    <span className="block text-xs text-fg-muted">{m.text}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+
+        {mode === 'UAT' || mode === 'LIVE' ? (
+          <fieldset disabled={disabled} className="grid gap-4 lg:grid-cols-2">
+            <legend className="mb-2 text-sm font-bold">2. Pay2All API token</legend>
+            <Field
+              label="API token"
+              required={!p.hasCredentials}
+              help={
+                p.credentialsMasked?.apiToken
+                  ? `Saved (${p.credentialsMasked.apiToken}). Enter a new token only to replace it.`
+                  : 'Pay2All → Developer → API token. Stored encrypted; never shown again.'
+              }
+            >
+              {(f) => (
+                <Input
+                  id={f.id}
+                  type="password"
+                  autoComplete="off"
+                  aria-describedby={f.describedBy}
+                  placeholder={p.hasCredentials ? '•••••••• (saved)' : 'Paste your API token'}
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                />
+              )}
+            </Field>
+            <Field
+              label="Bank-verify provider ID"
+              optionalLabel="optional"
+              help="Only if Pay2All gave you a different provider_id for account verification (default 127)."
+            >
+              {(f) => (
+                <Input
+                  id={f.id}
+                  inputMode="numeric"
+                  placeholder={p.credentialsMasked?.verifyProviderId ?? '127'}
+                  value={verifyId}
+                  onChange={(e) => setVerifyId(e.target.value.replace(/\D/g, ''))}
+                />
+              )}
+            </Field>
+          </fieldset>
+        ) : null}
+
+        <fieldset disabled={disabled}>
+          <legend className="mb-2 text-sm font-bold">
+            {mode === 'UAT' || mode === 'LIVE' ? '3' : '2'}. Offline or Live, per service
+          </legend>
+          <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+            {rows.map((s) => {
+              const live = services.includes(s) && canLive(s);
+              const pending = p.pendingServices.includes(s) && mode !== 'SIMULATOR';
+              return (
+                <li key={s} className="flex flex-wrap items-center gap-3 px-3 py-2.5">
+                  <ServiceIcon code={s} size="sm" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold">{label(s)}</span>
+                    <span className="block text-xs text-fg-muted">
+                      {pending
+                        ? 'Live coming soon — Pay2All has not published this API yet'
+                        : !canLive(s)
+                          ? mode === 'UAT'
+                            ? 'Pay2All test mode covers recharge only'
+                            : 'Choose Test or Live above to enable'
+                          : live
+                            ? 'Sent to Pay2All when you save the record'
+                            : 'Done on your portal, recorded here'}
+                    </span>
+                  </span>
+                  <div
+                    role="radiogroup"
+                    aria-label={`${label(s)} mode`}
+                    className="flex rounded-lg border border-border p-0.5"
+                  >
+                    {[false, true].map((v) => (
+                      <button
+                        key={String(v)}
+                        type="button"
+                        role="radio"
+                        aria-checked={live === v}
+                        disabled={v && (!canLive(s) || pending)}
+                        onClick={() =>
+                          setServices((x) =>
+                            v ? [...new Set([...x, s])] : x.filter((y) => y !== s),
+                          )
+                        }
+                        className={cn(
+                          'min-h-8 rounded-md px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-40',
+                          live === v
+                            ? v
+                              ? 'bg-brand text-on-brand'
+                              : 'bg-surface-muted text-fg'
+                            : 'text-fg-muted',
+                        )}
+                      >
+                        {v ? 'Live' : 'Offline'}
+                      </button>
+                    ))}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </fieldset>
+
+        {p.callbackUrl && (p.mode === 'LIVE' || p.mode === 'UAT') ? (
+          <div className="flex flex-col gap-2 rounded-xl bg-surface-muted/60 p-4 text-sm">
+            <p className="font-bold">Callback URL for Pay2All</p>
+            <p className="text-[13px] text-fg-muted">
+              Paste this in Pay2All → Developer → API settings → Webhook URL, so pending recharges
+              and bills update here by themselves. Keep it private.
+            </p>
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2">
+              <code className="min-w-0 flex-1 truncate text-xs">{p.callbackUrl}</code>
+              <CopyText text={p.callbackUrl} label="callback URL" />
+            </div>
+            <p className="text-[13px] text-fg-muted">
+              If Pay2All asks for an IP whitelist, add this server’s public IP address.
+            </p>
           </div>
         ) : null}
-        {canManage && planAllows && p.simulatorAvailable ? (
-          <>
-            <fieldset>
-              <legend className="mb-2 text-sm font-semibold">
-                {t('integrations.servicesForSimulator')}
-              </legend>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {p.supportedServices.map((s) => (
-                  <Checkbox
-                    key={s}
-                    label={label(s)}
-                    checked={services.includes(s)}
-                    onChange={(v) => setServices((x) => (v ? [...x, s] : x.filter((y) => y !== s)))}
-                  />
-                ))}
-              </div>
-            </fieldset>
-            <div className="flex flex-wrap gap-2">
-              {p.mode === 'SIMULATOR' ? (
-                <>
-                  <Button
-                    onClick={() => configure.mutate('SIMULATOR')}
-                    loading={configure.isPending}
-                  >
-                    {t('common.save')}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => configure.mutate('DISABLED')}
-                    loading={configure.isPending}
-                  >
-                    {t('integrations.disable')}
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  onClick={() => configure.mutate('SIMULATOR')}
-                  loading={configure.isPending}
-                  icon={<FlaskConical aria-hidden className="size-4" />}
-                >
-                  {t('integrations.enableSimulator')}
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                onClick={() => health.mutate()}
-                loading={health.isPending}
-                icon={<Activity aria-hidden className="size-4" />}
-              >
-                {t('integrations.healthCheck')}
-              </Button>
-            </div>
-          </>
-        ) : null}
-        {!canManage ? <p className="text-sm text-fg-muted">{t('integrations.viewOnly')}</p> : null}
+
+        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
+          {canManage ? (
+            <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!planAllows}>
+              {t('common.save')}
+            </Button>
+          ) : (
+            <p className="text-sm text-fg-muted">{t('integrations.viewOnly')}</p>
+          )}
+          {canManage && p.mode !== 'DISABLED' ? (
+            <Button
+              variant="outline"
+              onClick={() => health.mutate()}
+              loading={health.isPending}
+              icon={<Activity aria-hidden className="size-4" />}
+            >
+              Check connection
+            </Button>
+          ) : null}
+          <span className="ml-auto text-xs text-fg-muted">
+            {balance ??
+              (p.lastHealthAt
+                ? `${t('integrations.lastHealth')}: ${formatDateTime(p.lastHealthAt, timezone)} · ${p.lastHealthStatus ?? ''}`
+                : '')}
+          </span>
+        </div>
       </div>
     </Card>
+  );
+}
+
+/** Providers planned next — shown so owners know what's coming. */
+function ComingSoon() {
+  const items = [
+    { title: 'Flight booking', text: 'Search and book domestic flights', icon: Plane },
+    { title: 'Hotel booking', text: 'Rooms across India', icon: Hotel },
+    { title: 'More providers', text: 'Connect other API partners', icon: PlugZap },
+  ];
+  return (
+    <div className="grid gap-3 sm:grid-cols-3">
+      {items.map((i) => (
+        <div
+          key={i.title}
+          className="flex items-center gap-3 rounded-xl border border-dashed border-border p-4"
+        >
+          <span className="grid size-9 place-items-center rounded-lg bg-surface-muted text-fg-muted">
+            <i.icon aria-hidden className="size-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-bold">{i.title}</span>
+            <span className="block text-xs text-fg-muted">{i.text}</span>
+          </span>
+          <Badge tone="neutral">Soon</Badge>
+        </div>
+      ))}
+    </div>
   );
 }

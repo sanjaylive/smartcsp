@@ -13,6 +13,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/brand.dart';
 import '../../widgets/common.dart';
 import '../../widgets/sync_banner.dart';
+import '../notifications/notifications_sheet.dart';
 
 class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
@@ -29,6 +30,8 @@ class MoreScreen extends ConsumerWidget {
       if (can('followups.view')) (Icons.event_note_outlined, s.t('nav.followUps'), '/follow-ups', null),
       if (can('cashbook.view')) (Icons.account_balance_wallet_outlined, s.t('mobile.cash.title'), '/cash', null),
       if (can('cashbook.view')) (Icons.lock_clock_outlined, s.t('nav.closing'), '/closing', null),
+      if (can('settings.manage')) (Icons.qr_code_2_rounded, s.t('nav.payments'), '/settings/payments', null),
+      if (can('integrations.view')) (Icons.bolt_rounded, s.t('nav.integrations'), '/settings/integrations', null),
       (Icons.notifications_outlined, s.t('nav.notifications'), '/notifications', (ctx?.unreadNotifications ?? 0) > 0 ? '${ctx!.unreadNotifications}' : null),
       (Icons.settings_outlined, s.t('mobile.settings.title'), '/settings', null),
     ];
@@ -57,32 +60,33 @@ class MoreScreen extends ConsumerWidget {
   }
 }
 
+/// Confirms, then signs out of this device (or all devices). Warns about unsynced drafts.
+Future<void> confirmLogout(BuildContext context, WidgetRef ref, {required bool all}) async {
+  final s = context.s;
+  final unsynced = ref.read(syncProvider).unsynced;
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (d) => AlertDialog(
+      title: Text(all ? s.t('auth.sessions.logoutAll') : s.t('common.logout')),
+      content: Text([
+        all ? s.t('mobile.settings.logoutAllConfirm') : s.t('mobile.settings.logoutConfirm'),
+        if (unsynced > 0) s.t('mobile.settings.logoutDrafts', {'count': unsynced}),
+      ].join('\n\n')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(d, false), child: Text(s.t('common.cancel'))),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: unsynced > 0 ? context.tokens.danger : null),
+          onPressed: () => Navigator.pop(d, true),
+          child: Text(all ? s.t('auth.sessions.logoutAll') : s.t('common.logout')),
+        ),
+      ],
+    ),
+  );
+  if (ok == true) await ref.read(authProvider.notifier).logout(allDevices: all);
+}
+
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
-
-  Future<void> _logout(BuildContext context, WidgetRef ref, {required bool all}) async {
-    final s = context.s;
-    final unsynced = ref.read(syncProvider).unsynced;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (d) => AlertDialog(
-        title: Text(all ? s.t('auth.sessions.logoutAll') : s.t('common.logout')),
-        content: Text([
-          all ? s.t('mobile.settings.logoutAllConfirm') : s.t('mobile.settings.logoutConfirm'),
-          if (unsynced > 0) s.t('mobile.settings.logoutDrafts', {'count': unsynced}),
-        ].join('\n\n')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(d, false), child: Text(s.t('common.cancel'))),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: unsynced > 0 ? context.tokens.danger : null),
-            onPressed: () => Navigator.pop(d, true),
-            child: Text(all ? s.t('auth.sessions.logoutAll') : s.t('common.logout')),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) await ref.read(authProvider.notifier).logout(allDevices: all);
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -144,12 +148,12 @@ class SettingsScreen extends ConsumerWidget {
               key: const Key('settings.logout'),
               leading: const Icon(Icons.logout_rounded),
               title: Text(s.t('common.logout')),
-              onTap: () => _logout(context, ref, all: false),
+              onTap: () => confirmLogout(context, ref, all: false),
             ),
             ListTile(
               leading: Icon(Icons.phonelink_erase_rounded, color: context.tokens.danger),
               title: Text(s.t('auth.sessions.logoutAll'), style: TextStyle(color: context.tokens.danger)),
-              onTap: () => _logout(context, ref, all: true),
+              onTap: () => confirmLogout(context, ref, all: true),
             ),
           ]),
         ),
@@ -219,76 +223,12 @@ class SessionsScreen extends ConsumerWidget {
   }
 }
 
-class NotificationsScreen extends ConsumerWidget {
+class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final s = context.s;
-    final tz = ref.watch(shopTimezoneProvider);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(s.t('nav.notifications')),
-        actions: [
-          IconButton(
-            tooltip: s.t('mobile.notifications.markAll'),
-            icon: const Icon(Icons.done_all_rounded),
-            onPressed: () async {
-              try {
-                await ref.read(apiProvider).markAllNotificationsRead();
-                ref.invalidate(notificationsProvider);
-                ref.invalidate(tenantContextProvider);
-              } on ApiException catch (e) {
-                if (context.mounted) showSnack(context, errorText(context, e), error: true);
-              }
-            },
-          ),
-        ],
-      ),
-      body: AsyncView(
-        value: ref.watch(notificationsProvider),
-        onRetry: () => ref.invalidate(notificationsProvider),
-        builder: (page) => RefreshIndicator(
-          onRefresh: () => ref.refresh(notificationsProvider.future),
-          child: page.items.isEmpty
-              ? ListView(children: [EmptyView(message: s.t('mobile.notifications.empty'), icon: Icons.notifications_none_rounded)])
-              : ListView.separated(
-                  padding: const EdgeInsets.all(Tokens.s4),
-                  itemCount: page.items.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: Tokens.s2),
-                  itemBuilder: (_, i) {
-                    final n = page.items[i];
-                    return AppCard(
-                      padding: const EdgeInsets.all(Tokens.s3),
-                      onTap: n.isRead
-                          ? null
-                          : () async {
-                              try {
-                                await ref.read(apiProvider).markNotificationRead(n.id);
-                                ref.invalidate(notificationsProvider);
-                                ref.invalidate(tenantContextProvider);
-                              } on ApiException catch (_) {}
-                            },
-                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Icon(n.isRead ? Icons.notifications_none_rounded : Icons.notifications_active_rounded,
-                            color: n.isRead ? context.tokens.textMuted : Theme.of(context).colorScheme.primary,
-                            semanticLabel: n.isRead ? null : s.t('mobile.home.unread', {'count': 1})),
-                        const SizedBox(width: Tokens.s3),
-                        Expanded(
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(n.title, style: TextStyle(fontWeight: n.isRead ? FontWeight.w500 : FontWeight.w700)),
-                            const SizedBox(height: 2),
-                            Text(n.body),
-                            const SizedBox(height: 4),
-                            Text(formatDateTime(n.createdAt, tz), style: Theme.of(context).textTheme.bodySmall),
-                          ]),
-                        ),
-                      ]),
-                    );
-                  },
-                ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: Text(context.s.t('nav.notifications'))),
+        body: const Padding(padding: EdgeInsets.only(top: Tokens.s3), child: NotificationsPanel(inSheet: false)),
+      );
 }

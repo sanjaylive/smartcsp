@@ -68,6 +68,7 @@ class ServiceRecord {
     required this.expectedCommissionPaise,
     required this.receivedCommissionPaise,
     required this.paymentMethod,
+    this.paymentAccountId,
     required this.principalMethod,
     required this.amountCollectedPaise,
     required this.amountAllocatedPaise,
@@ -106,6 +107,9 @@ class ServiceRecord {
   final int expectedCommissionPaise;
   final int receivedCommissionPaise;
   final String paymentMethod;
+
+  /// The shop's UPI / bank account the customer paid into, when recorded.
+  final String? paymentAccountId;
   final String principalMethod;
   final int amountCollectedPaise;
   final int amountAllocatedPaise;
@@ -150,6 +154,7 @@ class ServiceRecord {
         expectedCommissionPaise: intOf(j, 'expectedCommissionPaise'),
         receivedCommissionPaise: intOf(j, 'receivedCommissionPaise'),
         paymentMethod: str(j, 'paymentMethod', 'CASH'),
+        paymentAccountId: strOrNull(j, 'paymentAccountId'),
         principalMethod: str(j, 'principalMethod', 'CASH'),
         amountCollectedPaise: intOf(j, 'amountCollectedPaise'),
         amountAllocatedPaise: intOf(j, 'amountAllocatedPaise'),
@@ -189,6 +194,7 @@ class RecordDraftData {
     this.customerFeePaise = 0,
     this.expectedCommissionPaise = 0,
     this.paymentMethod = 'CASH',
+    this.paymentAccountId,
     this.amountCollectedPaise = 0,
     this.principalMethod = 'CASH',
     this.externalRef,
@@ -211,6 +217,7 @@ class RecordDraftData {
   final int customerFeePaise;
   final int expectedCommissionPaise;
   final String paymentMethod;
+  final String? paymentAccountId;
   final int amountCollectedPaise;
   final String principalMethod;
   final String? externalRef;
@@ -235,6 +242,7 @@ class RecordDraftData {
         'customerFeePaise': customerFeePaise,
         'expectedCommissionPaise': expectedCommissionPaise,
         'paymentMethod': paymentMethod,
+        'paymentAccountId': (paymentMethod == 'UPI' || paymentMethod == 'BANK') && amountCollectedPaise > 0 ? paymentAccountId : null,
         'amountCollectedPaise': amountCollectedPaise,
         'principalMethod': principalMethod,
         'externalRef': _blank(externalRef),
@@ -260,6 +268,7 @@ class RecordDraftData {
         customerFeePaise: intOf(j, 'customerFeePaise'),
         expectedCommissionPaise: intOf(j, 'expectedCommissionPaise'),
         paymentMethod: str(j, 'paymentMethod', 'CASH'),
+        paymentAccountId: strOrNull(j, 'paymentAccountId'),
         amountCollectedPaise: intOf(j, 'amountCollectedPaise'),
         principalMethod: str(j, 'principalMethod', 'CASH'),
         externalRef: strOrNull(j, 'externalRef'),

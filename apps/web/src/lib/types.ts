@@ -161,6 +161,7 @@ export interface RecordJson {
   receivedCommissionPaise: number;
   paymentMethod: string;
   paymentMode: string | null;
+  paymentAccountId?: string | null;
   provider: string | null;
   principalMethod: string;
   amountCollectedPaise: number;
@@ -669,11 +670,16 @@ export interface AuditEvent {
 export interface IntegrationsOverview {
   providers: {
     provider: string;
-    mode: 'DISABLED' | 'SIMULATOR';
+    mode: 'DISABLED' | 'SIMULATOR' | 'UAT' | 'LIVE';
     liveAvailable: boolean;
-    liveUnavailableReason: string;
+    liveUnavailableReason: string | null;
+    liveServices: ServiceCode[];
+    uatServices: ServiceCode[];
+    pendingServices: ServiceCode[];
     missing: unknown;
     simulatorAvailable: boolean;
+    hasCredentials: boolean;
+    callbackUrl: string | null;
     credentialsMasked: Record<string, string> | null;
     keyVersion: number | null;
     enabledServices: ServiceCode[];
@@ -719,4 +725,36 @@ export interface ShopMaster {
   sortOrder: number;
   version: number;
   updatedAt: string;
+}
+
+/** The shop's own receiving account (Settings → Payment accounts). */
+export interface PaymentAccount {
+  id: string;
+  kind: 'UPI' | 'BANK';
+  label: string;
+  upiId: string | null;
+  upiApp: string | null;
+  payeeName: string | null;
+  holderName: string | null;
+  bankName: string | null;
+  accountNumber: string | null;
+  ifsc: string | null;
+  accountType: string | null;
+  qrAttachmentId: string | null;
+  isDefault: boolean;
+  active: boolean;
+  sortOrder: number;
+  version: number;
+  updatedAt: string;
+}
+
+/** A provider operation (Live service) and its record. */
+export interface ProviderOperationJson {
+  id: string;
+  mode: string;
+  status: 'INITIATED' | 'PENDING' | 'UNKNOWN' | 'CONFIRMED' | 'FAILED';
+  outcomeKnown: boolean;
+  message: string | null;
+  providerRef: string | null;
+  record: RecordJson;
 }

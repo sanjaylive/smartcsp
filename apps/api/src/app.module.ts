@@ -38,6 +38,8 @@ import { DomainsController } from './modules/domains/domains.controller';
 import { DomainsService } from './modules/domains/domains.service';
 import { MastersController } from './modules/masters/masters.controller';
 import { MastersService } from './modules/masters/masters.service';
+import { PaymentAccountsController } from './modules/payment-accounts/payment-accounts.controller';
+import { PaymentAccountsService } from './modules/payment-accounts/payment-accounts.service';
 import { IntegrationsController } from './modules/integrations/integrations.controller';
 import { AdminAuthController } from './modules/admin/admin-auth.controller';
 import { AdminController } from './modules/admin/admin.controller';
@@ -65,6 +67,7 @@ export const CONTROLLERS = [
   AdminController,
   DomainsController,
   MastersController,
+  PaymentAccountsController,
   SupportController,
 ];
 
@@ -92,6 +95,7 @@ export const CONTROLLERS = [
     Sms21Service,
     DomainsService,
     MastersService,
+    PaymentAccountsService,
     { provide: APP_GUARD, useClass: SecurityGuard },
   ],
 })

@@ -24,6 +24,7 @@ import {
   Menu,
   Plus,
   PlugZap,
+  QrCode,
   ReceiptIndianRupee,
   ShieldCheck,
   Store,
@@ -65,6 +66,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   shop: Store,
   services: Layers,
   masters: ListChecks,
+  payments: QrCode,
   integrations: PlugZap,
   notifications: Bell,
   security: ShieldCheck,
@@ -76,7 +78,16 @@ const GROUPS: Array<{ key: string; items: string[] }> = [
   { key: 'navGroup.money', items: ['cashbook', 'expenses', 'commissions', 'closing', 'reports'] },
   {
     key: 'navGroup.shop',
-    items: ['staff', 'subscription', 'shop', 'services', 'masters', 'integrations', 'audit'],
+    items: [
+      'staff',
+      'subscription',
+      'shop',
+      'services',
+      'masters',
+      'payments',
+      'integrations',
+      'audit',
+    ],
   },
   { key: 'navGroup.account', items: ['notifications', 'security'] },
 ];

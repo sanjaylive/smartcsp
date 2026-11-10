@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,6 +14,8 @@ import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
 import '../../widgets/sync_banner.dart';
+import '../account/profile_sheet.dart';
+import '../notifications/notifications_sheet.dart';
 import '../records/service_picker.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -40,11 +44,14 @@ class HomeScreen extends ConsumerWidget {
             Text(s.t('role.${ctxValue.value!.role}'), style: TextStyle(fontSize: Tokens.fontXs, color: context.tokens.textMuted)),
         ]),
         actions: [
+          _BellButton(fallback: unread),
           IconButton(
-            tooltip: '${s.t('nav.notifications')}${unread > 0 ? ' · ${s.t('mobile.home.unread', {'count': unread})}' : ''}',
-            onPressed: () => context.push('/notifications'),
-            icon: Badge(isLabelVisible: unread > 0, label: Text('$unread'), child: const Icon(Icons.notifications_outlined)),
+            key: const Key('home.profile'),
+            tooltip: s.t('mobile.profile.title'),
+            onPressed: () => showProfileSheet(context),
+            icon: InitialsAvatar(name: auth.me?.user.label ?? '?'),
           ),
+          const SizedBox(width: Tokens.s1),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -342,4 +349,55 @@ class _CheckItem extends StatelessWidget {
         trailing: done || onTap == null ? null : const Icon(Icons.chevron_right_rounded),
         onTap: done ? null : onTap,
       );
+}
+
+/// Bell with a live unread badge (refreshed every minute and when the app returns to the foreground).
+class _BellButton extends ConsumerStatefulWidget {
+  const _BellButton({required this.fallback});
+  final int fallback;
+
+  @override
+  ConsumerState<_BellButton> createState() => _BellButtonState();
+}
+
+class _BellButtonState extends ConsumerState<_BellButton> with WidgetsBindingObserver {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _timer = Timer.periodic(const Duration(seconds: 60), (_) => ref.invalidate(unreadCountProvider));
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) ref.invalidate(unreadCountProvider);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    final unread = ref.watch(unreadCountProvider).value ?? widget.fallback;
+    return IconButton(
+      key: const Key('home.notifications'),
+      tooltip: '${s.t('nav.notifications')}${unread > 0 ? ' · ${s.t('mobile.home.unread', {'count': unread})}' : ''}',
+      onPressed: () async {
+        await showNotificationsSheet(context);
+        ref.invalidate(unreadCountProvider);
+      },
+      icon: Badge(
+        isLabelVisible: unread > 0,
+        label: Text(unread > 99 ? '99+' : '$unread'),
+        child: Icon(unread > 0 ? Icons.notifications_active_outlined : Icons.notifications_outlined),
+      ),
+    );
+  }
 }

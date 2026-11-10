@@ -1113,12 +1113,12 @@ const L = {
 
   // integrations
   'integrations.help': [
-    'Optional provider connections. Manual records never trigger provider operations.',
-    'वैकल्पिक प्रदाता कनेक्शन। मैनुअल रिकॉर्ड कभी प्रदाता कार्य नहीं चलाते।',
+    'Choose, per service, whether you only record work done on your portal (Offline) or send it through Pay2All from here (Live).',
+    'हर सेवा के लिए चुनें: अपने पोर्टल पर किया काम सिर्फ़ दर्ज करें (ऑफ़लाइन) या यहीं से Pay2All से भेजें (लाइव)।',
   ],
   'integrations.notice': [
-    'CSP2All records your work by default. It does not move money unless a connector is live — and no live connector is available yet.',
-    'CSP2All डिफ़ॉल्ट रूप से आपका काम दर्ज करता है। जब तक कनेक्टर लाइव न हो, यह पैसा नहीं भेजता — और अभी कोई लाइव कनेक्टर उपलब्ध नहीं है।',
+    'Offline records never move money. Live services are paid from your own Pay2All wallet — keep it topped up.',
+    'ऑफ़लाइन रिकॉर्ड कभी पैसा नहीं भेजते। लाइव सेवाएँ आपके अपने Pay2All वॉलेट से चलती हैं — उसमें बैलेंस रखें।',
   ],
   'integrations.pay2all': ['Pay2All connector', 'Pay2All कनेक्टर'],
   'integrations.liveUnavailable': ['Live mode is not available', 'लाइव मोड उपलब्ध नहीं है'],
@@ -1168,7 +1168,8 @@ const L = {
   'integrations.noOps': ['No provider operations', 'कोई प्रदाता कार्य नहीं'],
   'integrations.mode': ['Mode', 'मोड'],
   'integrations.providerRef': ['Provider reference', 'प्रदाता संदर्भ'],
-  'connectorMode.DISABLED': ['Disabled', 'बंद'],
+  'connectorMode.DISABLED': ['Offline', 'ऑफ़लाइन'],
+  'connectorMode.UAT': ['Test (UAT)', 'टेस्ट (UAT)'],
   'connectorMode.SIMULATOR': ['Simulator', 'सिम्युलेटर'],
   'connectorMode.LIVE': ['Live', 'लाइव'],
   'connectorStatus.NONE': ['None', 'कोई नहीं'],

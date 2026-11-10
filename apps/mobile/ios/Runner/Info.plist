@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose your shop's UPI QR code image to show customers.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Take a photo of your shop's UPI QR code to show customers.</string>
 </dict>
 </plist>

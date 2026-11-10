@@ -15,6 +15,7 @@ import '../data/local/draft_store.dart';
 import '../data/local/sync_queue.dart';
 import '../data/models/auth_models.dart';
 import '../data/models/money_models.dart';
+import '../data/models/payment_models.dart';
 import '../data/models/record_models.dart';
 import '../data/models/tenant_models.dart';
 import '../data/repositories/csp_api.dart';
@@ -310,3 +311,54 @@ Future<AppServices> createAppServices({required SharedPreferences prefs, require
 }
 
 typedef TokenStoreFactory = TokenStore Function();
+
+/// Unread notifications for the bell badge; the home screen refreshes it every minute.
+final unreadCountProvider = FutureProvider.autoDispose<int>((ref) async {
+  final tenantId = ref.watch(activeTenantIdProvider);
+  if (tenantId == null) return 0;
+  return ref.watch(apiProvider).unreadNotifications();
+});
+
+/// Saved DMT beneficiaries of a customer (active first, as the server orders them).
+final beneficiariesProvider = FutureProvider.autoDispose.family<List<Beneficiary>, String>(
+    (ref, customerId) async => (await ref.watch(apiProvider).beneficiaries(customerId)).where((b) => b.active).toList());
+
+/// Account-name verification needs a connected provider; any failure means "not available".
+final accountVerifyAvailableProvider = FutureProvider.autoDispose<bool>((ref) async {
+  try {
+    return await ref.watch(apiProvider).accountVerifyAvailable();
+  } catch (_) {
+    return false;
+  }
+});
+
+/// The shop's own UPI IDs and bank accounts (Settings → Payment accounts).
+final paymentAccountsProvider = FutureProvider.autoDispose<List<PaymentAccount>>((ref) async {
+  final tenantId = ref.watch(activeTenantIdProvider);
+  if (tenantId == null) return const [];
+  return ref.watch(apiProvider).paymentAccounts();
+});
+
+/// Signed link to an uploaded image (e.g. a UPI QR). Freshly uploaded files are briefly
+/// quarantined while scanned, so a "still being checked" answer is retried a few times.
+final attachmentUrlProvider = FutureProvider.autoDispose.family<String, String>((ref, id) async {
+  for (var i = 0;; i++) {
+    try {
+      return await ref.watch(apiProvider).attachmentUrl(id);
+    } on ApiException catch (e) {
+      if (i >= 4 || e.status != 409) rethrow;
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+    }
+  }
+});
+
+/// Pay2All connector settings (Integrations).
+final integrationsProvider = FutureProvider.autoDispose<ConnectorOverview>((ref) => ref.watch(apiProvider).integrations());
+
+final p2aOperatorsProvider = FutureProvider.autoDispose<List<P2AOperator>>((ref) => ref.watch(apiProvider).p2aOperators());
+
+final p2aBillCategoriesProvider = FutureProvider.autoDispose<List<(String, String)>>((ref) => ref.watch(apiProvider).p2aBillCategories());
+
+final p2aBillersProvider = FutureProvider.autoDispose.family<List<(String, String)>, String>((ref, c) => ref.watch(apiProvider).p2aBillers(c));
+
+final p2aBillerParamsProvider = FutureProvider.autoDispose.family<List<BillerParam>, String>((ref, id) => ref.watch(apiProvider).p2aBillerParams(id));

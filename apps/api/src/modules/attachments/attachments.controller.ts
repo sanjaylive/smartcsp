@@ -29,7 +29,14 @@ import { EntitlementsService } from '../subscription/entitlements.service';
 import { visibleWhere } from '../records/records.service';
 
 const uploadSchema = z.object({
-  ownerType: z.enum(['RECORD', 'CUSTOMER', 'CUSTOMER_KYC', 'PAYMENT_SUBMISSION', 'TENANT_LOGO']),
+  ownerType: z.enum([
+    'RECORD',
+    'CUSTOMER',
+    'CUSTOMER_KYC',
+    'PAYMENT_SUBMISSION',
+    'TENANT_LOGO',
+    'PAYMENT_QR',
+  ]),
   ownerId: z.uuid(),
 });
 
@@ -173,6 +180,19 @@ export class AttachmentsController implements OnModuleInit {
           throw notFound('Payment submission');
         return;
       }
+      case 'PAYMENT_QR': {
+        // The shop's own payment QR: every member shows it to customers; only managers change it.
+        if (mode === 'write' && !ctx.permissions.has('settings.manage'))
+          throw denied('settings.manage');
+        if (
+          !(await tx.paymentAccount.findFirst({
+            where: { id: ownerId, tenantId: ctx.tenantId, kind: 'UPI' },
+            select: { id: true },
+          }))
+        )
+          throw notFound('Payment account');
+        return;
+      }
       case 'TENANT_LOGO': {
         if (mode === 'write' && !ctx.permissions.has('settings.manage'))
           throw denied('settings.manage');
@@ -209,6 +229,8 @@ export class AttachmentsController implements OnModuleInit {
     if (!kind) throw new AppError('FILE_REJECTED', 'Only PNG, JPEG and PDF files are accepted');
     if (dto.ownerType === 'TENANT_LOGO' && kind.type === 'application/pdf')
       throw new AppError('FILE_REJECTED', 'Logos must be PNG or JPEG');
+    if (dto.ownerType === 'PAYMENT_QR' && kind.type === 'application/pdf')
+      throw new AppError('FILE_REJECTED', 'Upload the QR code as a PNG or JPEG image');
     return this.db.inTenant(ctx, async (tx) => {
       await this.assertOwnerAccess(tx, ctx, dto.ownerType, dto.ownerId, 'write');
       await this.entitlements.assertStorage(tx, ctx.tenantId, file.size);
@@ -234,6 +256,21 @@ export class AttachmentsController implements OnModuleInit {
       });
       if (dto.ownerType === 'TENANT_LOGO')
         await tx.tenant.update({ where: { id: ctx.tenantId }, data: { logoAttachmentId: id } });
+      if (dto.ownerType === 'PAYMENT_QR') {
+        // One QR per account: the previous image is retired.
+        const acct = await tx.paymentAccount.findFirstOrThrow({
+          where: { id: dto.ownerId, tenantId: ctx.tenantId },
+        });
+        if (acct.qrAttachmentId)
+          await tx.attachment.updateMany({
+            where: { id: acct.qrAttachmentId, tenantId: ctx.tenantId },
+            data: { deletedAt: new Date() },
+          });
+        await tx.paymentAccount.update({
+          where: { id: acct.id },
+          data: { qrAttachmentId: id, version: { increment: 1 } },
+        });
+      }
       await this.jobs.enqueue(
         tx,
         'attachment.scan',
@@ -294,6 +331,11 @@ export class AttachmentsController implements OnModuleInit {
       if (!a) throw notFound('Attachment');
       await this.assertOwnerAccess(tx, ctx, a.ownerType, a.ownerId, 'write');
       await tx.attachment.update({ where: { id }, data: { deletedAt: new Date() } });
+      if (a.ownerType === 'PAYMENT_QR')
+        await tx.paymentAccount.updateMany({
+          where: { tenantId: ctx.tenantId, qrAttachmentId: id },
+          data: { qrAttachmentId: null, version: { increment: 1 } },
+        });
       await this.audit.tenant(tx, ctx, {
         action: 'attachment.deleted',
         targetType: 'attachment',

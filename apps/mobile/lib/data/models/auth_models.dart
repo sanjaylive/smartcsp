@@ -2,14 +2,23 @@ import '../api/token_store.dart';
 import 'json.dart';
 
 class AppUser {
-  const AppUser({required this.id, required this.email, this.displayName, this.locale});
+  const AppUser({required this.id, required this.email, this.phone, this.displayName, this.locale});
   final String id;
   final String email;
+  final String? phone;
   final String? displayName;
   final String? locale;
 
-  factory AppUser.fromJson(Json j) =>
-      AppUser(id: str(j, 'id'), email: str(j, 'email'), displayName: strOrNull(j, 'displayName'), locale: strOrNull(j, 'locale'));
+  /// Best name to show: display name, else email, else phone.
+  String get label => (displayName ?? '').trim().isNotEmpty ? displayName!.trim() : (email.isNotEmpty ? email : (phone ?? ''));
+
+  factory AppUser.fromJson(Json j) => AppUser(
+        id: str(j, 'id'),
+        email: str(j, 'email'),
+        phone: strOrNull(j, 'phone'),
+        displayName: strOrNull(j, 'displayName'),
+        locale: strOrNull(j, 'locale'),
+      );
 }
 
 class TenantMembership {

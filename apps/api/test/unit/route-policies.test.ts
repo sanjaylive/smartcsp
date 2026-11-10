@@ -47,6 +47,7 @@ describe('route access policies', () => {
         'HealthController.publicConfig',
         'HealthController.ready',
         'HealthController.tlsCheck',
+        'IntegrationsController.pay2allCallback',
         'IntegrationsController.webhook',
       ].sort(),
     );
