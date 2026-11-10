@@ -13,6 +13,7 @@ import '../../l10n/strings.dart';
 import '../../state/providers.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
+import '../payments/payment_widgets.dart';
 import '../../widgets/common.dart';
 
 class RecordDetailScreen extends ConsumerWidget {
@@ -233,6 +234,7 @@ class _RecordDetailBodyState extends ConsumerState<_RecordDetailBody> {
             _money(s.t('mobile.record.receivable'), r.receivablePaise),
             _money(s.t('record.amountCollected'), r.amountCollectedPaise),
             KeyValueRow(label: s.t('record.paymentMethod'), value: s.t('method.${r.paymentMethod}')),
+            if (r.paymentAccountId != null) KeyValueRow(label: s.t('mobile.pay.paidInto'), value: '', valueWidget: PaidIntoText(accountId: r.paymentAccountId!)),
             if (r.amountAllocatedPaise > 0) _money(s.t('dues.collect'), r.amountAllocatedPaise),
             _money(s.t('record.amountDue'), r.amountDuePaise, emphasise: r.amountDuePaise > 0),
           ]),

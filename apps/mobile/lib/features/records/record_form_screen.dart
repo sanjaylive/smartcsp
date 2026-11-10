@@ -20,6 +20,9 @@ import '../../state/providers.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
+import '../payments/payment_widgets.dart';
+import 'beneficiary_section.dart';
+import 'live_section.dart';
 
 const _uuid = Uuid();
 
@@ -144,6 +147,18 @@ class _RecordFormState extends ConsumerState<RecordForm> {
   Map<String, String> _errors = {};
   String? _formError;
   bool _busy = false;
+  String? _paymentAccountId;
+
+  /// Live (Pay2All): offered when the owner set this service to Live in Integrations.
+  bool get _liveCapable => widget.draft == null && const ['RECHARGE', 'BILL_PAYMENT'].contains(svc.code) && (widget.ctx?.service(svc.code)?.liveAvailable ?? false);
+  /// The operator's Offline / Live choice; until they pick, Live is the default when available
+  /// (the shop context can arrive after the form is first built).
+  bool? _liveChoice;
+  bool get _isLive => _liveChoice ?? _liveCapable;
+  LiveState? _liveState;
+  String? _liveError;
+  String? _liveKey;
+  String? _liveBody;
 
   @override
   void initState() {
@@ -173,6 +188,7 @@ class _RecordFormState extends ConsumerState<RecordForm> {
       _collected.text = paiseToInput(d.amountCollectedPaise);
       _collectedEdited = true;
       _paymentMethod = d.paymentMethod;
+      _paymentAccountId = d.paymentAccountId;
       _principalMethod = d.principalMethod;
       _externalRef.text = d.externalRef ?? '';
       _notes.text = d.notes ?? '';
@@ -195,6 +211,9 @@ class _RecordFormState extends ConsumerState<RecordForm> {
     }
     super.dispose();
   }
+
+  /// DMT gets the guided beneficiary section instead of plain fields.
+  bool get _isDmt => svc.code == 'DMT' && beneficiaryKeys.every((k) => _text.containsKey(k));
 
   bool _isTextLike(FieldType t) =>
       t == FieldType.text || t == FieldType.number || t == FieldType.phone || t == FieldType.account || t == FieldType.ifsc;
@@ -261,6 +280,7 @@ class _RecordFormState extends ConsumerState<RecordForm> {
         customerFeePaise: _amount(_fee),
         expectedCommissionPaise: _amount(_commission),
         paymentMethod: _amount(_collected) == 0 && _paymentMethod == 'NONE' ? 'NONE' : _paymentMethod,
+        paymentAccountId: _paymentAccountId,
         amountCollectedPaise: _amount(_collected),
         principalMethod: _principalMethod,
         externalRef: _externalRef.text,
@@ -281,6 +301,81 @@ class _RecordFormState extends ConsumerState<RecordForm> {
   }
 
   // ------------------------------------------------------------------ actions
+
+  /// Live section changed: copy its choices into the record details and amount.
+  void _onLive(LiveState st) {
+    setState(() {
+      _liveState = st;
+      _liveError = null;
+      st.details.forEach((k, v) {
+        if (_text.containsKey(k)) {
+          if (_text[k]!.text != v) _text[k]!.text = v;
+        } else if (_values.containsKey(k)) {
+          _values[k] = v.isEmpty ? null : v;
+        }
+        _errors.remove('details.$k');
+      });
+    });
+    if (st.amountPaise != null && st.amountPaise! > 0) _principal.text = paiseToInput(st.amountPaise!);
+  }
+
+  /// Sends a Live recharge / bill payment through Pay2All after the operator confirms.
+  Future<void> _submitLive() async {
+    final s = context.s;
+    final st = _liveState;
+    if (st == null || !st.ready) {
+      setState(() => _liveError = st?.problem ?? s.t('mobile.live.fillFirst'));
+      return;
+    }
+    if (!_check()) return;
+    final data = _build(post: false);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: Text(s.t(svc.code == 'BILL_PAYMENT' ? 'mobile.live.confirmBill' : 'mobile.live.confirmRecharge')),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(s.t('mobile.live.confirmBody'), style: TextStyle(color: context.tokens.textMuted)),
+          const SizedBox(height: Tokens.s3),
+          if (svc.code == 'RECHARGE') ...[
+            KeyValueRow(label: s.t('mobile.live.mobileNumber'), value: '${data.details['subscriberNumber'] ?? ''}'),
+            KeyValueRow(label: s.t('field.operator'), value: s.t('option.operator.${data.details['operator'] ?? 'OTHER'}')),
+          ] else ...[
+            KeyValueRow(label: s.t('mobile.live.biller'), value: '${data.details['billerName'] ?? ''}'),
+            KeyValueRow(label: s.t('field.consumerId'), value: '${data.details['consumerId'] ?? ''}'),
+          ],
+          KeyValueRow(label: s.t(svc.principalLabelKey ?? 'record.principal.generic'), value: '', valueWidget: MoneyText(data.principalPaise)),
+          KeyValueRow(label: s.t('mobile.record.receivable'), value: '', valueWidget: MoneyText(_receivable)),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d, false), child: Text(s.t('common.back'))),
+          FilledButton.icon(key: const Key('live.confirm'), onPressed: () => Navigator.pop(d, true), icon: const Icon(Icons.bolt_rounded), label: Text(s.t('mobile.live.confirmSend'))),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final body = jsonEncode({...data.toApiJson(), 'live': st.live});
+    if (body != _liveBody) {
+      _liveKey = _uuid.v4();
+      _liveBody = body;
+    }
+    setState(() => _busy = true);
+    try {
+      final op = await ref.read(apiProvider).executeLive(data, st.live, idempotencyKey: _liveKey!);
+      ref.invalidate(dashboardProvider);
+      ref.invalidate(tenantContextProvider);
+      if (!mounted) return;
+      await showLiveResult(context, ref, op);
+      if (mounted) context.pushReplacement('/records/${op.record.id}');
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errors = _mapFieldErrors(e.fields);
+        _formError = e.isNetwork ? s.t('mobile.live.offline') : errorText(context, e);
+      });
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   Future<void> _submitOnline({required bool post}) async {
     if (!_check()) return;
@@ -392,6 +487,7 @@ class _RecordFormState extends ConsumerState<RecordForm> {
     final canPost = ctx?.can('records.post') ?? false;
     final postable = isPostableStatus(svc.workflow, _opStatus);
     final isDraftEdit = widget.draft != null;
+    final live = _isLive && _liveCapable;
     final collected = _amount(_collected);
     final due = (_receivable - collected).clamp(0, maxPaise);
     final cash = cashEffect(
@@ -423,6 +519,27 @@ class _RecordFormState extends ConsumerState<RecordForm> {
             SectionTitle(s.t('record.customer')),
             _customerSection(s),
             SectionTitle(s.t('common.details')),
+            if (_liveCapable) ...[
+              LiveModeSwitch(live: _isLive, onChanged: (v) => setState(() => _liveChoice = v)),
+              const SizedBox(height: Tokens.s2),
+              Text(s.t(live ? 'mobile.live.liveHelp' : 'mobile.live.offlineHelp'), style: TextStyle(color: context.tokens.textMuted, fontSize: 13)),
+              const SizedBox(height: Tokens.s3),
+            ],
+            if (live) ...[
+              if (!online) ...[
+                InfoBanner(text: s.t('mobile.live.offline'), tone: BannerTone.warning, icon: Icons.wifi_off_rounded),
+                const SizedBox(height: Tokens.s3),
+              ],
+              if (svc.code == 'RECHARGE')
+                RechargeLive(onChanged: _onLive, amountPaise: _principalPaise)
+              else
+                BillLive(onChanged: _onLive),
+              if (_liveError != null) ...[
+                const SizedBox(height: Tokens.s2),
+                InfoBanner(key: const Key('live.error'), text: _liveError!, tone: BannerTone.danger),
+              ],
+              const SizedBox(height: Tokens.s3),
+            ],
             _dateField(
               key: 'txnDate',
               label: svc.workflow == WorkflowType.application ? s.t('record.applicationDate') : s.t('record.txnDate'),
@@ -430,7 +547,7 @@ class _RecordFormState extends ConsumerState<RecordForm> {
               onPicked: (v) => setState(() => _txnDate = v),
             ),
             const SizedBox(height: Tokens.s3),
-            DropdownButtonFormField<String>(
+            if (!live) DropdownButtonFormField<String>(
               key: const Key('record.status'),
               initialValue: _opStatus,
               isExpanded: true,
@@ -440,7 +557,18 @@ class _RecordFormState extends ConsumerState<RecordForm> {
             ),
             const SizedBox(height: Tokens.s3),
             if (svc.fields.isEmpty) Text(s.t('mobile.record.noFields'), style: TextStyle(color: context.tokens.textMuted)),
-            for (final f in svc.fields) ...[_fieldWidget(s, f), const SizedBox(height: Tokens.s3)],
+            for (final f in live ? const <FieldDef>[] : svc.fields)
+              if (_isDmt && f.key == beneficiaryKeys.first) ...[
+                const SizedBox(height: Tokens.s2),
+                BeneficiarySection(
+                  controllers: {for (final k in beneficiaryKeys) k: _text[k]!},
+                  errors: _errors,
+                  onEdited: (k) => setState(() => _errors.remove('details.$k')),
+                  customerId: _customer?.id,
+                  canSave: (ctx?.can('customers.manage') ?? false),
+                ),
+                const SizedBox(height: Tokens.s3),
+              ] else if (!(_isDmt && beneficiaryKeys.contains(f.key))) ...[_fieldWidget(s, f), const SizedBox(height: Tokens.s3)],
             SectionTitle(s.t('mobile.record.amounts')),
             if (_showPrincipal) ...[
               _amountField('principalPaise', _principal, s.t(svc.principalLabelKey!)),
@@ -469,6 +597,17 @@ class _RecordFormState extends ConsumerState<RecordForm> {
               const ['CASH', 'UPI', 'BANK', 'NONE'],
               (v) => setState(() => _paymentMethod = v),
             ),
+            if ((_paymentMethod == 'UPI' || _paymentMethod == 'BANK') && collected > 0) ...[
+              const SizedBox(height: Tokens.s3),
+              CollectPanel(
+                method: _paymentMethod,
+                amountPaise: collected,
+                accountId: _paymentAccountId,
+                onAccount: (id) => setState(() => _paymentAccountId = id),
+                note: s.t('service.${svc.code}.name'),
+                canManage: ctx?.can('settings.manage') ?? false,
+              ),
+            ],
             const SizedBox(height: Tokens.s3),
             AppCard(
               color: context.tokens.surfaceMuted,
@@ -514,9 +653,31 @@ class _RecordFormState extends ConsumerState<RecordForm> {
           ],
         ),
       ),
-      _actions(s, online: online, canPost: canPost && postable, isDraftEdit: isDraftEdit),
+      if (live) _liveActions(s, online: online) else _actions(s, online: online, canPost: canPost && postable, isDraftEdit: isDraftEdit),
     ]);
   }
+
+  Widget _liveActions(AppStrings s, {required bool online}) => Container(
+        padding: const EdgeInsets.fromLTRB(Tokens.s4, Tokens.s3, Tokens.s4, Tokens.s3),
+        decoration: BoxDecoration(color: context.tokens.surface, border: Border(top: BorderSide(color: context.tokens.border))),
+        child: SafeArea(
+          top: false,
+          child: Row(children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                Text(s.t('mobile.record.receivable'), style: TextStyle(color: context.tokens.textMuted, fontSize: 12)),
+                MoneyText(_receivable, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              ]),
+            ),
+            FilledButton.icon(
+              key: const Key('live.send'),
+              onPressed: _busy || !online ? null : _submitLive,
+              icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5)) : const Icon(Icons.bolt_rounded),
+              label: Text(s.t(svc.code == 'BILL_PAYMENT' ? 'mobile.live.payNow' : 'mobile.live.rechargeNow')),
+            ),
+          ]),
+        ),
+      );
 
   Widget _actions(AppStrings s, {required bool online, required bool canPost, required bool isDraftEdit}) {
     final spinner = const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5));

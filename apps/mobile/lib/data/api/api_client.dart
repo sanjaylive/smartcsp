@@ -65,6 +65,7 @@ class ApiClient {
       final res = await call();
       final data = res.data;
       if (data is Map) return data.cast<String, Object?>();
+      if (data is List) return <String, Object?>{'items': data};
       return <String, Object?>{};
     } on DioException catch (e) {
       throw ApiException.fromDio(e);

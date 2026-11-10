@@ -75,6 +75,19 @@ void main() {
           return FakeResponse(200, contextJson(permissions: const ['records.view', 'records.create', 'records.post', 'customers.view', 'customers.manage', 'cashbook.view', 'dues.view', 'followups.view', 'followups.manage', 'day.close']));
         case '/v1/dashboard':
           return FakeResponse(200, _dashboard());
+        case '/v1/notifications':
+          final now = DateTime.now().toUtc();
+          Map<String, Object?> n(String id, String type, String title, String body, Duration ago, {String? link, bool read = false}) =>
+              {'id': id, 'type': type, 'title': title, 'body': body, 'link': link, 'readAt': read ? now.toIso8601String() : null, 'createdAt': now.subtract(ago).toIso8601String()};
+          final items = [
+            n('n1', 'FOLLOWUPS_DUE', '3 follow-ups due today', 'Ramesh (PAN), Sita (DMT) and 1 more are waiting.', const Duration(minutes: 5), link: '/app/follow-ups'),
+            n('n2', 'CLOSING_VARIANCE', 'Cash short by ₹250 at yesterday’s closing', 'Check the cashbook and record the reason.', const Duration(hours: 3), link: '/app/closing'),
+            n('n3', 'EXPORT_READY', 'Your records export is ready', 'Download it from Reports within 7 days.', const Duration(days: 1)),
+            n('n4', 'SUBSCRIPTION', 'Free plan: 80% of monthly records used', 'Upgrade to keep adding records without limits.', const Duration(days: 4), read: true),
+          ];
+          return FakeResponse(200, {'items': items, 'page': 1, 'pageSize': 15, 'total': 4, 'pages': 1, 'unread': 3});
+        case '/v1/beneficiaries/verify':
+          return const FakeResponse(200, {'available': false, 'mode': null, 'reason': 'NOT_CONFIGURED'});
         case '/v1/records/r1':
           return FakeResponse(200, {
             ...recordJson(no: 141, id: 'r1'),
@@ -114,4 +127,31 @@ void main() {
   testWidgets('home dark', (t) => shot(t, 'home_dark', b: Brightness.dark));
   testWidgets('new AEPS record', (t) => shot(t, 'record_form_aeps', location: '/records/new?service=AEPS'));
   testWidgets('record detail', (t) => shot(t, 'record_detail', location: '/records/r1'));
+  Future<void> settle(WidgetTester t) async {
+    for (var i = 0; i < 20; i++) {
+      await t.pump(const Duration(milliseconds: 50));
+    }
+  }
+
+  testWidgets('profile sheet', (t) => shot(t, 'profile_sheet', act: () async {
+        await t.tap(find.byKey(const Key('home.profile')));
+        await settle(t);
+      }));
+  testWidgets('notifications sheet', (t) => shot(t, 'notifications_sheet', act: () async {
+        await t.tap(find.byKey(const Key('home.notifications')));
+        await settle(t);
+      }));
+  testWidgets('new DMT record', (t) => shot(t, 'record_form_dmt', location: '/records/new?service=DMT', act: () async {
+        await t.enterText(find.byKey(const Key('field.accountNumber')), '32109876543210');
+        await t.enterText(find.byKey(const Key('field.ifsc')), 'SBIN0004567');
+        await settle(t);
+        await Scrollable.ensureVisible(t.element(find.byKey(const Key('field.accountNumber'))), alignment: 0.15);
+        await settle(t);
+      }));
+  testWidgets('bank picker', (t) => shot(t, 'bank_picker', location: '/records/new?service=DMT', act: () async {
+        await Scrollable.ensureVisible(t.element(find.byKey(const Key('field.accountNumber'))), alignment: 0.15);
+        await settle(t);
+        await t.tap(find.byKey(const Key('ben.pickBank')));
+        await settle(t);
+      }));
 }

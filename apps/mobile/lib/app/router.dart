@@ -10,6 +10,8 @@ import '../features/money/cash_screen.dart';
 import '../features/money/dues_screen.dart';
 import '../features/money/followups_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
+import '../features/payments/integrations_screen.dart';
+import '../features/payments/payment_accounts_screen.dart';
 import '../features/records/drafts_screen.dart';
 import '../features/records/record_detail_screen.dart';
 import '../features/records/record_form_screen.dart';
@@ -70,6 +72,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       page('/notifications', (_) => const NotificationsScreen()),
       page('/settings', (_) => const SettingsScreen()),
       page('/settings/sessions', (_) => const SessionsScreen()),
+      page('/settings/payments', (_) => const PaymentAccountsScreen()),
+      page('/settings/integrations', (_) => const IntegrationsScreen()),
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => _Shell(shell: shell),
         branches: [
