@@ -20,6 +20,7 @@ import '../../state/providers.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
+import '../../widgets/operator_badge.dart';
 import '../payments/payment_widgets.dart';
 import 'beneficiary_section.dart';
 import 'live_section.dart';
@@ -98,7 +99,7 @@ class RecordFormScreen extends ConsumerWidget {
     final code = draft?.data.serviceCode ?? serviceCode;
     final customId = draft?.data.customServiceId ?? customServiceId;
     final svc = ResolvedService.resolve(code, customId: customId, ctx: ctxValue.value);
-    final title = s.t('record.new', {'service': svc?.customName ?? s.t('service.$code.name')});
+    final title = svc?.customName ?? s.t('service.$code.name');
 
     Widget body;
     if (svc == null && code == 'CUSTOM' && ctxValue.isLoading) {
@@ -232,6 +233,14 @@ class _RecordFormState extends ConsumerState<RecordForm> {
   int get _receivable => receivableFor(_direction, _principalPaise, _amount(_fee));
 
   /// Until the operator edits it, "amount collected now" follows what the customer owes.
+  /// After the recharge type changes: drop an operator that doesn't belong to it, and pick the only one if there is one.
+  void _fitOperatorToType() {
+    final allowed = rechargeOperatorsByType[_values['rechargeType']];
+    if (allowed == null || !_values.containsKey('operator')) return;
+    if (!allowed.contains(_values['operator'])) _values['operator'] = null;
+    if (allowed.length == 1) _values['operator'] = allowed.single;
+  }
+
   void _syncCollected() {
     if (_collectedEdited) return;
     final r = _receivable;
@@ -889,17 +898,28 @@ class _RecordFormState extends ConsumerState<RecordForm> {
         );
       case FieldType.select:
         final v = _values[f.key] as String?;
+        final options = visibleOptions(f, _values);
         return DropdownButtonFormField<String>(
-          key: key,
-          initialValue: f.options.any((o) => o.value == v) ? v : null,
+          // The operator list depends on the recharge type, so rebuild it when that changes.
+          key: f.key == 'operator' ? ValueKey('field.operator.${_values['rechargeType']}') : key,
+          initialValue: options.any((o) => o.value == v) ? v : null,
           isExpanded: true,
           decoration: InputDecoration(labelText: label, helperText: help, errorText: error),
           hint: Text(s.t('mobile.common.select')),
-          items: [for (final o in f.options) DropdownMenuItem(value: o.value, child: Text(s.label(o.labelKey, literal: f.literalLabel)))],
+          items: [
+            for (final o in options)
+              DropdownMenuItem(
+                value: o.value,
+                child: f.key == 'operator'
+                    ? OperatorOption(codeOrName: o.value, label: s.label(o.labelKey, literal: f.literalLabel))
+                    : Text(s.label(o.labelKey, literal: f.literalLabel)),
+              ),
+          ],
           onChanged: (x) {
             setState(() {
               _values[f.key] = x;
               _errors.remove('details.${f.key}');
+              if (f.key == 'rechargeType') _fitOperatorToType();
             });
             _syncCollected(); // AEPS/MicroATM operation changes the principal direction
           },

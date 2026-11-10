@@ -11,6 +11,7 @@ import '../../state/providers.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
+import '../../widgets/operator_badge.dart';
 
 /// What the Live section hands back to the record form.
 class LiveState {
@@ -232,7 +233,7 @@ class _RechargeLiveState extends ConsumerState<RechargeLive> {
         isExpanded: true,
         decoration: InputDecoration(labelText: s.t('field.operator'), errorText: ops.hasError ? errorText(context, ops.error!) : null),
         hint: Text(ops.isLoading ? s.t('mobile.live.loadingOperators') : s.t('mobile.live.chooseOperator')),
-        items: [for (final o in list) DropdownMenuItem(value: o.id, child: Text(o.name))],
+        items: [for (final o in list) DropdownMenuItem(value: o.id, child: OperatorOption(codeOrName: o.name, label: o.name))],
         onChanged: (v) {
           setState(() => _providerId = v);
           _emit();

@@ -49,15 +49,15 @@ class Tokens {
     border: Color(0xFFDDE1EC),
     text: Color(0xFF161A2E),
     textMuted: Color(0xFF525A75),
-    brand: Color(0xFF4F46E5),
-    brandStrong: Color(0xFF4338CA),
-    brandAlt: Color(0xFF7C3AED),
+    brand: Color(0xFFDC2626),
+    brandStrong: Color(0xFFB91C1C),
+    brandAlt: Color(0xFFEA580C),
     onBrand: Color(0xFFFFFFFF),
     success: Color(0xFF15803D),
     warning: Color(0xFFB45309),
     danger: Color(0xFFB91C1C),
     info: Color(0xFF1D4ED8),
-    focus: Color(0xFF6366F1),
+    focus: Color(0xFFEF4444),
   );
 
   static const dark = ColorTokens(
@@ -67,15 +67,15 @@ class Tokens {
     border: Color(0xFF2E3352),
     text: Color(0xFFECEEF8),
     textMuted: Color(0xFFA3A9C7),
-    brand: Color(0xFF818CF8),
-    brandStrong: Color(0xFFA5B4FC),
-    brandAlt: Color(0xFFA78BFA),
+    brand: Color(0xFFF87171),
+    brandStrong: Color(0xFFFCA5A5),
+    brandAlt: Color(0xFFFB923C),
     onBrand: Color(0xFF0E1020),
     success: Color(0xFF4ADE80),
     warning: Color(0xFFFBBF24),
     danger: Color(0xFFF87171),
     info: Color(0xFF60A5FA),
-    focus: Color(0xFFA5B4FC),
+    focus: Color(0xFFFCA5A5),
   );
 
   /// Service accents: `bg` is a card tint, `fg` is AA-contrast text/icon on that tint.

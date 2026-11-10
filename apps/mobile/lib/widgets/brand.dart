@@ -4,7 +4,7 @@ import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import '../theme/tokens.dart';
 
-/// Simple CSP2All mark: an indigo→violet rounded square with a ledger glyph. No third-party logos.
+/// Simple CSP2All mark: a flat brand-red rounded square with a ledger glyph. No third-party logos.
 class BrandMark extends StatelessWidget {
   const BrandMark({super.key, this.size = 56});
   final double size;
@@ -15,7 +15,7 @@ class BrandMark extends StatelessWidget {
           width: size,
           height: size,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+            color: Tokens.light.brand,
             borderRadius: BorderRadius.circular(size * 0.28),
           ),
           child: Icon(Icons.menu_book_rounded, color: Colors.white, size: size * 0.55),

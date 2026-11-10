@@ -12,15 +12,15 @@ export const tokens = {
       border: '#DDE1EC',
       text: '#161A2E',
       textMuted: '#525A75',
-      brand: '#4F46E5', // indigo-600
-      brandStrong: '#4338CA',
-      brandAlt: '#7C3AED', // violet-600
+      brand: '#DC2626', // red-600
+      brandStrong: '#B91C1C',
+      brandAlt: '#EA580C', // orange-600
       onBrand: '#FFFFFF',
       success: '#15803D',
       warning: '#B45309',
       danger: '#B91C1C',
       info: '#1D4ED8',
-      focus: '#6366F1',
+      focus: '#EF4444',
     },
     dark: {
       background: '#0E1020',
@@ -29,15 +29,15 @@ export const tokens = {
       border: '#2E3352',
       text: '#ECEEF8',
       textMuted: '#A3A9C7',
-      brand: '#818CF8',
-      brandStrong: '#A5B4FC',
-      brandAlt: '#A78BFA',
+      brand: '#F87171',
+      brandStrong: '#FCA5A5',
+      brandAlt: '#FB923C',
       onBrand: '#0E1020',
       success: '#4ADE80',
       warning: '#FBBF24',
       danger: '#F87171',
       info: '#60A5FA',
-      focus: '#A5B4FC',
+      focus: '#FCA5A5',
     },
     /** Service accents: `bg` is a tint for cards, `fg` is AA-contrast text/icon on that tint. */
     accent: {

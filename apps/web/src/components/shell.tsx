@@ -587,10 +587,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main
-        id="main"
-        className="mx-auto w-full max-w-[1400px] px-4 pt-4 pb-28 sm:px-6 lg:pb-10 print:max-w-none print:p-0"
-      >
+      <main id="main" className="w-full px-4 pt-4 pb-28 sm:px-6 lg:px-8 lg:pb-10 print:p-0">
         <div className="print:hidden">
           <Banners ctx={c} />
         </div>

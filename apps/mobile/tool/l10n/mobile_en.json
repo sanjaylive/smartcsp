@@ -71,7 +71,7 @@
   "mobile.record.change": "Change",
   "mobile.record.amounts": "Amounts",
   "mobile.record.amountHint": "₹ 0.00",
-  "mobile.record.save": "Save record",
+  "mobile.record.save": "Save",
   "mobile.record.saveAndPost": "Save and post to cashbook",
   "mobile.record.saveDraft": "Save draft on this device",
   "mobile.record.saved": "Record #{no} saved",

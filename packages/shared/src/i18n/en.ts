@@ -203,7 +203,7 @@ export const en = {
   'service.BILL_PAYMENT.description': 'Electricity, water, gas and other bills',
   'service.PAN.name': 'PAN Services',
   'service.PAN.description': 'Track PAN applications and corrections',
-  'service.AADHAAR.name': 'Aadhaar Center Records',
+  'service.AADHAAR.name': 'Aadhaar Center',
   'service.AADHAAR.description': 'Appointments and update requests (no Aadhaar numbers stored)',
   'service.DOCUMENT.name': 'Document Submission',
   'service.DOCUMENT.description': 'Certificates and other department submissions',

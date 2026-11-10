@@ -2,6 +2,8 @@
 
 import { Plus, Trash2 } from 'lucide-react';
 import type { FieldDef } from '@csp2all/shared';
+import { cn } from '@/lib/cn';
+import { OperatorTiles } from './operator-badge';
 import { useI18n } from '@/lib/i18n';
 import { Button, Checkbox, Field, Input, Select } from './ui';
 
@@ -55,7 +57,10 @@ export function DetailField({
   onChange,
   error,
   labelOverride,
+  options: optionsOverride,
 }: {
+  /** Options to offer instead of `field.options` (e.g. operators filtered by recharge type). */
+  options?: FieldDef['options'];
   field: FieldDef;
   value: DetailValue;
   onChange: (v: DetailValue) => void;
@@ -64,6 +69,7 @@ export function DetailField({
 }) {
   const { tk, t } = useI18n();
   const label = labelOverride ?? tk(field.labelKey);
+  const options = optionsOverride ?? field.options ?? [];
   const help = field.helpKey ? tk(field.helpKey) : undefined;
   if (field.type === 'boolean') {
     return (
@@ -137,6 +143,7 @@ export function DetailField({
       error={error}
       required={field.required}
       optionalLabel={t('common.optional')}
+      className={field.key === 'operator' ? 'col-span-full' : undefined}
     >
       {({ id, describedBy, invalid }) => {
         const common = {
@@ -148,10 +155,57 @@ export function DetailField({
         const str = typeof value === 'string' ? value : '';
         switch (field.type) {
           case 'select':
+            if (field.key === 'operator')
+              return (
+                <OperatorTiles
+                  id={id}
+                  label={label}
+                  invalid={invalid}
+                  describedBy={describedBy}
+                  value={str}
+                  options={options.map((o) => ({ value: o.value, label: tk(o.labelKey) }))}
+                  onChange={(v) => onChange(v)}
+                />
+              );
+            if (field.key === 'rechargeType')
+              return (
+                <div
+                  id={id}
+                  role="radiogroup"
+                  tabIndex={-1}
+                  aria-label={label}
+                  aria-invalid={invalid || undefined}
+                  aria-describedby={describedBy}
+                  className="flex flex-wrap gap-2"
+                >
+                  {options.map((o) => {
+                    const on = o.value === str;
+                    return (
+                      <button
+                        key={o.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        onClick={() => onChange(o.value)}
+                        className={cn(
+                          'inline-flex min-h-10 items-center rounded-[10px] border px-3.5 text-sm font-semibold transition focus-visible:ring-3 focus-visible:ring-focus/30 focus-visible:outline-none',
+                          on
+                            ? 'border-brand bg-brand-bg text-brand-strong dark:text-fg'
+                            : invalid
+                              ? 'border-danger/60 bg-surface hover:border-brand/40'
+                              : 'border-border bg-surface text-fg hover:border-brand/40',
+                        )}
+                      >
+                        {tk(o.labelKey)}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
             return (
               <Select {...common} value={str} onChange={(e) => onChange(e.target.value)}>
                 <option value="">{t('form.choose')}</option>
-                {(field.options ?? []).map((o) => (
+                {options.map((o) => (
                   <option key={o.value} value={o.value}>
                     {tk(o.labelKey)}
                   </option>

@@ -26,6 +26,7 @@ import type { ProviderOperationJson } from '@/lib/types';
 import { Alert, Button, Field, Input, Money, Select } from './ui';
 import { Dialog, Drawer } from './ui/dialog';
 import { cn } from '@/lib/cn';
+import { OperatorTiles } from './operator-badge';
 
 /* ----------------------------------------------------------------------------- types */
 
@@ -244,25 +245,26 @@ export function RechargeLive({
             />
           )}
         </Field>
-        <Field label="Operator" required>
-          {(p) => (
-            <Select
-              id={p.id}
-              value={providerId ? String(providerId) : ''}
-              onChange={(e) => setProviderId(e.target.value ? Number(e.target.value) : null)}
-            >
-              <option value="">
-                {providers.isLoading ? 'Loading operators…' : 'Choose operator'}
-              </option>
-              {operators.map((o) => (
-                <option key={o.provider_id} value={String(o.provider_id)}>
-                  {o.name}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
       </div>
+      <Field label="Operator" required>
+        {(p) =>
+          providers.isLoading ? (
+            <p className="text-sm text-fg-muted">Loading operators…</p>
+          ) : (
+            <OperatorTiles
+              id={p.id}
+              label="Operator"
+              value={providerId ? String(providerId) : ''}
+              options={operators.map((o) => ({
+                value: String(o.provider_id),
+                label: o.name,
+                mark: o.name,
+              }))}
+              onChange={(v) => setProviderId(Number(v))}
+            />
+          )
+        }
+      </Field>
       <ErrorLine error={providers.error ?? lookup.error} />
       {op ? (
         <div className="flex flex-wrap items-center gap-3">
